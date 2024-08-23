@@ -33,7 +33,8 @@
             android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+                <action android:name="START_ANALYSIS" />
             </intent-filter>
             <meta-data
                 android:name="android.accessibilityservice"
@@ -42,11 +43,10 @@
 
         <service
             android:name=".OverlayService"
-            android:permission="android.permission.FOREGROUND_SERVICE"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:exported="true"
+            android:permission="android.permission.SYSTEM_ALERT_WINDOW">
             <intent-filter>
-                <action android:name="android.intent.action.FOREGROUND_SERVICE" />
+                <action android:name="UPDATE_OVERLAY" />
             </intent-filter>
         </service>
 

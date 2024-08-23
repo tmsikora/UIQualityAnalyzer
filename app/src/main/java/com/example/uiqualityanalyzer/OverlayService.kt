@@ -1,7 +1,11 @@
 package com.example.uiqualityanalyzer
 
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
@@ -9,51 +13,67 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
-import android.widget.Toast
+import android.widget.TextView
+import androidx.annotation.RequiresApi
 
 class OverlayService : Service() {
 
     private lateinit var windowManager: WindowManager
     private lateinit var overlayView: View
+    private lateinit var analysisTextView: TextView
 
     override fun onCreate() {
         super.onCreate()
-
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        setupOverlay()
+    }
 
-        // Inflate the layout for the overlay
+    private fun setupOverlay() {
         overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null)
+        analysisTextView = overlayView.findViewById(R.id.analysis_text)
 
-        // Set up layout parameters
-        val layoutParams = WindowManager.LayoutParams(
+        val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            android.graphics.PixelFormat.TRANSLUCENT
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
         )
-        layoutParams.gravity = Gravity.TOP or Gravity.END
-        layoutParams.x = 0
-        layoutParams.y = 100
 
-        // Add the view to the window
-        windowManager.addView(overlayView, layoutParams)
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = 0
+        params.y = 100
 
-        // Set up button click listener
-        val button = overlayView.findViewById<Button>(R.id.overlay_button)
-        button.setOnClickListener {
-            Toast.makeText(this, "Overlay button clicked", Toast.LENGTH_SHORT).show()
-            // Start analysis here
+        windowManager.addView(overlayView, params)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        intent?.getStringExtra("analysis_result")?.let { result ->
+            updateOverlayContent(result)
         }
+
+        overlayView.findViewById<Button>(R.id.start_analysis_button).setOnClickListener {
+            startAnalysis()
+        }
+
+        return START_STICKY
+    }
+
+    private fun startAnalysis() {
+        // Send a broadcast to the accessibility service to start the analysis
+        val analysisIntent = Intent(this, UIQualityAccessibilityService::class.java).apply {
+            action = "START_ANALYSIS"
+        }
+        startService(analysisIntent)
+    }
+
+    fun updateOverlayContent(analysisResult: String) {
+        analysisTextView.text = analysisResult
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Remove the view when the service is destroyed
-        if (::overlayView.isInitialized) {
-            windowManager.removeView(overlayView)
-        }
+        windowManager.removeView(overlayView)
     }
 
     override fun onBind(intent: Intent?): IBinder? {

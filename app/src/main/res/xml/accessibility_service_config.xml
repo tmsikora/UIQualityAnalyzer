@@ -1,12 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/accessibility_service_description"
-    android:accessibilityEventTypes="typeAllMask"
-    android:packageNames="com.example.uiqualityanalyzer"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked"
+    android:packageNames=""
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="100"
     android:canRetrieveWindowContent="true"
-    android:settingsActivity="com.example.uiqualityanalyzer.SettingsActivity"
-    android:canRequestTouchExplorationMode="true"
+    android:settingsActivity=""
+    android:canRequestEnhancedWebAccessibility="true"
     android:canRequestFilterKeyEvents="true"
-    android:canPerformGestures="true"
-    />
+    android:canRequestTouchExplorationMode="true" />

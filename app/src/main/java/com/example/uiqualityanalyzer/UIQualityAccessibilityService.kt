@@ -1,6 +1,7 @@
 package com.example.uiqualityanalyzer
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -15,9 +16,21 @@ class UIQualityAccessibilityService : AccessibilityService() {
         // Handle interrupt
     }
 
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        val info = AccessibilityServiceInfo().apply {
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
+            feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+            flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        }
+        serviceInfo = info
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "START_ANALYSIS") {
-            analyzeUI(rootInActiveWindow)
+            // Ponowne pobranie rootInActiveWindow bez wykonania gestu wstecz
+            val rootNode = rootInActiveWindow
+            analyzeUI(rootNode)
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -58,13 +71,5 @@ class UIQualityAccessibilityService : AccessibilityService() {
             }
         }
         return count
-    }
-
-    private fun AccessibilityNodeInfo.textColor(): String? {
-        return null
-    }
-
-    private fun AccessibilityNodeInfo.textSize(): String? {
-        return null
     }
 }

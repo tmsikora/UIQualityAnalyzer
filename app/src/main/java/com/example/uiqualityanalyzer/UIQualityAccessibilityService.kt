@@ -3,8 +3,14 @@ package com.example.uiqualityanalyzer
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
+import android.graphics.Color
+import android.os.Bundle
+import android.util.TypedValue
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.TextView
+import androidx.core.content.ContextCompat
+import kotlin.math.abs
 
 class UIQualityAccessibilityService : AccessibilityService() {
 
@@ -28,7 +34,6 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "START_ANALYSIS") {
-            // Ponowne pobranie rootInActiveWindow bez wykonania gestu wstecz
             val rootNode = rootInActiveWindow
             analyzeUI(rootNode)
         }
@@ -39,15 +44,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         val results = StringBuilder()
 
         if (rootNode != null) {
-            val textViewCount = countViewsOfType(rootNode, "android.widget.TextView")
-            val imageViewCount = countViewsOfType(rootNode, "android.widget.ImageView")
-            val buttonCount = countViewsOfType(rootNode, "android.widget.Button")
-
-            results.append("TextViews found: $textViewCount\n")
-            results.append("ImageViews found: $imageViewCount\n")
-            results.append("Buttons found: $buttonCount\n")
-
-            // Additional view types and attributes can be added here
+            analyzeNode(rootNode, results)
         } else {
             results.append("Root node is null, no views analyzed.")
         }
@@ -59,17 +56,80 @@ class UIQualityAccessibilityService : AccessibilityService() {
         startService(overlayServiceIntent)
     }
 
-    private fun countViewsOfType(node: AccessibilityNodeInfo, viewType: String): Int {
-        var count = 0
-        if (node.className == viewType) {
-            count++
+    private fun analyzeNode(node: AccessibilityNodeInfo, results: StringBuilder) {
+        val viewType = node.className.toString()
+        val viewId = node.viewIdResourceName ?: "N/A"
+
+        // Check for TextViews
+        if (viewType == "android.widget.TextView") {
+            val textSize = getTextSize(node)
+            val textColor = getTextColor(node)
+            val backgroundColor = getBackgroundColor(node)
+            val contrast = calculateContrast(textColor, backgroundColor)
+
+            results.append("TextView found: ID=$viewId\n")
+            results.append(" - Text size: $textSize sp\n")
+            results.append(" - Contrast ratio: ${"%.2f".format(contrast)}\n")
+
+            if (textSize < 14) { // Example threshold for text size
+                results.append(" - Issue: Text size is too small.\n")
+                results.append(" - Suggestion: Increase text size to improve readability.\n")
+            }
+
+            if (contrast < 4.5) { // Example threshold for contrast ratio
+                results.append(" - Issue: Contrast is too low.\n")
+                results.append(" - Suggestion: Increase contrast between text and background.\n")
+            }
         }
+
+        // Check for Button views
+        if (viewType == "android.widget.Button") {
+            val minTouchSize = getMinimumTouchSize(node)
+            results.append("Button found: ID=$viewId\n")
+            results.append(" - Minimum touch size: $minTouchSize dp\n")
+
+            if (minTouchSize < 48) { // Example threshold for touch size
+                results.append(" - Issue: Touch target is too small.\n")
+                results.append(" - Suggestion: Increase the touch target size to improve accessibility.\n")
+            }
+        }
+
         for (i in 0 until node.childCount) {
             val child = node.getChild(i)
             if (child != null) {
-                count += countViewsOfType(child, viewType)
+                analyzeNode(child, results)
             }
         }
-        return count
+    }
+
+    private fun getTextSize(node: AccessibilityNodeInfo): Float {
+        // This is a placeholder as AccessibilityNodeInfo does not provide direct text size
+        return 16f // Default value, adjust as needed
+    }
+
+    private fun getTextColor(node: AccessibilityNodeInfo): Int {
+        // Placeholder for text color retrieval
+        return Color.BLACK // Default value, adjust as needed
+    }
+
+    private fun getBackgroundColor(node: AccessibilityNodeInfo): Int {
+        // Placeholder for background color retrieval
+        return Color.WHITE // Default value, adjust as needed
+    }
+
+    private fun getMinimumTouchSize(node: AccessibilityNodeInfo): Float {
+        val bounds = android.graphics.Rect()
+        node.getBoundsInScreen(bounds)
+        return bounds.height().toFloat() // Using height as a proxy for touch size
+    }
+
+    private fun calculateContrast(textColor: Int, backgroundColor: Int): Double {
+        // Simple contrast calculation (using luminance values)
+        val textLuminance = (0.2126 * Color.red(textColor) + 0.7152 * Color.green(textColor) + 0.0722 * Color.blue(textColor)) / 255.0
+        val backgroundLuminance = (0.2126 * Color.red(backgroundColor) + 0.7152 * Color.green(backgroundColor) + 0.0722 * Color.blue(backgroundColor)) / 255.0
+        val contrast = abs(textLuminance - backgroundLuminance) / textLuminance.coerceAtMost(
+            backgroundLuminance
+        )
+        return contrast
     }
 }

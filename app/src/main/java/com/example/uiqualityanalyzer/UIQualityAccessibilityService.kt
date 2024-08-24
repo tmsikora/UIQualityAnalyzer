@@ -4,12 +4,8 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.graphics.Color
-import android.os.Bundle
-import android.util.TypedValue
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.TextView
-import androidx.core.content.ContextCompat
 import kotlin.math.abs
 
 class UIQualityAccessibilityService : AccessibilityService() {
@@ -62,19 +58,12 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
         // Check for TextViews
         if (viewType == "android.widget.TextView") {
-            val textSize = getTextSize(node)
             val textColor = getTextColor(node)
             val backgroundColor = getBackgroundColor(node)
             val contrast = calculateContrast(textColor, backgroundColor)
 
             results.append("TextView found: ID=$viewId\n")
-            results.append(" - Text size: $textSize sp\n")
             results.append(" - Contrast ratio: ${"%.2f".format(contrast)}\n")
-
-            if (textSize < 14) { // Example threshold for text size
-                results.append(" - Issue: Text size is too small.\n")
-                results.append(" - Suggestion: Increase text size to improve readability.\n")
-            }
 
             if (contrast < 4.5) { // Example threshold for contrast ratio
                 results.append(" - Issue: Contrast is too low.\n")
@@ -100,11 +89,6 @@ class UIQualityAccessibilityService : AccessibilityService() {
                 analyzeNode(child, results)
             }
         }
-    }
-
-    private fun getTextSize(node: AccessibilityNodeInfo): Float {
-        // This is a placeholder as AccessibilityNodeInfo does not provide direct text size
-        return 16f // Default value, adjust as needed
     }
 
     private fun getTextColor(node: AccessibilityNodeInfo): Int {

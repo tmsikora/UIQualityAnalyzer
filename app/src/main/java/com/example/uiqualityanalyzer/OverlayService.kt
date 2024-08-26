@@ -1,12 +1,8 @@
 package com.example.uiqualityanalyzer
 
 import android.app.Service
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.PixelFormat
-import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -14,13 +10,14 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
-import androidx.annotation.RequiresApi
 
 class OverlayService : Service() {
 
     private lateinit var windowManager: WindowManager
     private lateinit var overlayView: View
     private lateinit var analysisTextView: TextView
+    private lateinit var minimizeResultsButton: Button
+    private var isMinimized = false
 
     override fun onCreate() {
         super.onCreate()
@@ -31,6 +28,7 @@ class OverlayService : Service() {
     private fun setupOverlay() {
         overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null)
         analysisTextView = overlayView.findViewById(R.id.analysis_text)
+        minimizeResultsButton = overlayView.findViewById(R.id.minimize_results_button)
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -56,6 +54,10 @@ class OverlayService : Service() {
             startAnalysis()
         }
 
+        minimizeResultsButton.setOnClickListener {
+            toggleResultsVisibility()
+        }
+
         return START_STICKY
     }
 
@@ -69,11 +71,29 @@ class OverlayService : Service() {
 
     fun updateOverlayContent(analysisResult: String) {
         analysisTextView.text = analysisResult
+        analysisTextView.visibility = View.VISIBLE
+        minimizeResultsButton.visibility = View.VISIBLE
+        isMinimized = false
+    }
+
+    private fun toggleResultsVisibility() {
+        if (::analysisTextView.isInitialized && ::minimizeResultsButton.isInitialized) {
+            if (isMinimized) {
+                analysisTextView.visibility = View.VISIBLE
+                minimizeResultsButton.text = "Minimize Results"
+            } else {
+                analysisTextView.visibility = View.GONE
+                minimizeResultsButton.text = "Show Results"
+            }
+            isMinimized = !isMinimized
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        windowManager.removeView(overlayView)
+        if (::overlayView.isInitialized && overlayView.isAttachedToWindow) {
+            windowManager.removeView(overlayView)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? {

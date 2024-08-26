@@ -24,8 +24,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +34,7 @@ import androidx.core.content.ContextCompat
 class MainActivity : ComponentActivity() {
     private var isServiceEnabled by mutableStateOf(false)
     private var hasOverlayPermission by mutableStateOf(false)
+    private var isOverlayRunning by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,8 +43,10 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 isServiceEnabled = isServiceEnabled,
                 hasOverlayPermission = hasOverlayPermission,
+                isOverlayRunning = isOverlayRunning,
                 onRequestOverlayPermission = { requestOverlayPermission() },
                 onStartOverlayClick = { startOverlayService() },
+                onStopOverlayClick = { stopOverlayService() },
                 onRequestAccessibilitySettings = { requestAccessibilitySettings() }
             )
         }
@@ -77,16 +80,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestOverlayPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                intent.data = android.net.Uri.parse("package:$packageName")
-                overlayPermissionResultLauncher.launch(intent)
-            } else {
-                hasOverlayPermission = true
-                startOverlayService()
-            }
+        if (!Settings.canDrawOverlays(this)) {
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+            intent.data = android.net.Uri.parse("package:$packageName")
+            overlayPermissionResultLauncher.launch(intent)
         } else {
+            hasOverlayPermission = true
             startOverlayService()
         }
     }
@@ -95,9 +94,16 @@ class MainActivity : ComponentActivity() {
         if (isAccessibilityServiceEnabled()) {
             val intent = Intent(this, OverlayService::class.java)
             ContextCompat.startForegroundService(this, intent)
+            isOverlayRunning = true
         } else {
             Toast.makeText(this, "Please enable the accessibility service first.", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun stopOverlayService() {
+        val intent = Intent(this, OverlayService::class.java)
+        stopService(intent)
+        isOverlayRunning = false
     }
 
     private val overlayPermissionResultLauncher =
@@ -114,12 +120,12 @@ fun MainScreen(
     modifier: Modifier = Modifier,
     isServiceEnabled: Boolean,
     hasOverlayPermission: Boolean,
+    isOverlayRunning: Boolean,
     onRequestOverlayPermission: () -> Unit,
     onStartOverlayClick: () -> Unit,
+    onStopOverlayClick: () -> Unit,
     onRequestAccessibilitySettings: () -> Unit
 ) {
-    val context = LocalContext.current
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -134,38 +140,48 @@ fun MainScreen(
             fontSize = 32.sp
         )
         Spacer(modifier = Modifier.height(24.dp))
-        if (!isServiceEnabled) {
-            Text(
-                text = "Accessibility service is disabled. Please enable it to use the analyzer.",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { onRequestAccessibilitySettings() }) {
-                Text(text = "Enable Accessibility Service")
+        when {
+            !isServiceEnabled -> {
+                Text(
+                    text = "Accessibility service is disabled. Please enable it to use the analyzer.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = { onRequestAccessibilitySettings() }) {
+                    Text(text = "Enable Accessibility Service")
+                }
             }
-        } else if (!hasOverlayPermission) {
-            Text(
-                text = "Overlay permission is not granted. Please grant it to use the overlay.",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { onRequestOverlayPermission() }) {
-                Text(text = "Request Overlay Permission")
+            !hasOverlayPermission -> {
+                Text(
+                    text = "Overlay permission is not granted. Please grant it to use the overlay.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = { onRequestOverlayPermission() }) {
+                    Text(text = "Request Overlay Permission")
+                }
             }
-        } else {
-            Text(
-                text = "All permissions are granted.",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { onStartOverlayClick() }) {
-                Text(text = "Start Overlay")
+            else -> {
+                Text(
+                    text = "All permissions are granted.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                if (isOverlayRunning) {
+                    Button(onClick = { onStopOverlayClick() }) {
+                        Text(text = "Stop Overlay")
+                    }
+                } else {
+                    Button(onClick = { onStartOverlayClick() }) {
+                        Text(text = "Start Overlay")
+                    }
+                }
             }
         }
     }
@@ -177,8 +193,10 @@ fun MainScreenPreview() {
     MainScreen(
         isServiceEnabled = false,
         hasOverlayPermission = false,
+        isOverlayRunning = false,
         onRequestOverlayPermission = {},
         onStartOverlayClick = {},
+        onStopOverlayClick = {},
         onRequestAccessibilitySettings = {}
     )
 }

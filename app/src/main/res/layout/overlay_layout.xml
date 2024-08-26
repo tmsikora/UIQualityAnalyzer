@@ -12,6 +12,13 @@
         android:layout_height="wrap_content"
         android:text="Start Analysis" />
 
+    <Button
+        android:id="@+id/minimize_results_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Minimize Results"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/analysis_text"
         android:layout_width="wrap_content"

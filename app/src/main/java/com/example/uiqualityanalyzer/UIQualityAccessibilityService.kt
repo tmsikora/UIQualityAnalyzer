@@ -107,9 +107,11 @@ class UIQualityAccessibilityService : AccessibilityService() {
     }
 
     private fun checkSpacing(node: AccessibilityNodeInfo, results: StringBuilder) {
-        // Placeholder for spacing check
         val nodeBounds = Rect()
         node.getBoundsInScreen(nodeBounds)
+
+        val minEdgeSpacingDp = 8
+        checkEdgeSpacing(nodeBounds, results, minEdgeSpacingDp)
 
         val parentNode = node.parent ?: return
         for (i in 0 until parentNode.childCount) {
@@ -120,11 +122,56 @@ class UIQualityAccessibilityService : AccessibilityService() {
             sibling.getBoundsInScreen(siblingBounds)
 
             val spacing = calculateSpacing(nodeBounds, siblingBounds)
-            if (spacing < 8) { // Example threshold for spacing in dp
-                results.append(" - Issue: Insufficient spacing between elements.\n")
+            val spacingDp = convertPixelsToDp(spacing)
+
+            if (spacingDp < minEdgeSpacingDp) {
+                results.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
                 results.append(" - Suggestion: Increase spacing to at least 8dp.\n")
             }
         }
+    }
+
+    private fun checkEdgeSpacing(nodeBounds: Rect, results: StringBuilder, minEdgeSpacingDp: Int) {
+        val leftSpacingDp = convertPixelsToDp(nodeBounds.left)
+        val rightSpacingDp = convertPixelsToDp(resources.displayMetrics.widthPixels - nodeBounds.right)
+        val topSpacingDp = convertPixelsToDp(nodeBounds.top)
+        val bottomSpacingDp = convertPixelsToDp(resources.displayMetrics.heightPixels - nodeBounds.bottom)
+
+        if (leftSpacingDp < minEdgeSpacingDp) {
+            results.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
+            results.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
+        }
+
+        if (rightSpacingDp < minEdgeSpacingDp) {
+            results.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
+            results.append(" - Suggestion: Increase spacing from the right edge to at least ${minEdgeSpacingDp}dp.\n")
+        }
+
+        if (topSpacingDp < minEdgeSpacingDp) {
+            results.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
+            results.append(" - Suggestion: Increase spacing from the top edge to at least ${minEdgeSpacingDp}dp.\n")
+        }
+
+        if (bottomSpacingDp < minEdgeSpacingDp) {
+            results.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
+            results.append(" - Suggestion: Increase spacing from the bottom edge to at least ${minEdgeSpacingDp}dp.\n")
+        }
+    }
+
+    private fun calculateSpacing(bounds1: Rect, bounds2: Rect): Int {
+        val horizontalSpacing = when {
+            bounds1.right <= bounds2.left -> bounds2.left - bounds1.right
+            bounds2.right <= bounds1.left -> bounds1.left - bounds2.right
+            else -> 0
+        }
+
+        val verticalSpacing = when {
+            bounds1.bottom <= bounds2.top -> bounds2.top - bounds1.bottom
+            bounds2.bottom <= bounds1.top -> bounds1.top - bounds2.bottom
+            else -> 0
+        }
+
+        return horizontalSpacing.coerceAtLeast(verticalSpacing)
     }
 
     private fun getTextColor(node: AccessibilityNodeInfo): Int {
@@ -150,11 +197,5 @@ class UIQualityAccessibilityService : AccessibilityService() {
         } else {
             (backgroundLuminance + 0.05) / (textLuminance + 0.05)
         }
-    }
-
-    private fun calculateSpacing(bounds1: Rect, bounds2: Rect): Int {
-        val horizontalSpacing = maxOf(0, bounds2.left - bounds1.right, bounds1.left - bounds2.right)
-        val verticalSpacing = maxOf(0, bounds2.top - bounds1.bottom, bounds1.top - bounds2.bottom)
-        return horizontalSpacing.coerceAtLeast(verticalSpacing)
     }
 }

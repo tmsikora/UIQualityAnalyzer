@@ -9,7 +9,6 @@ import android.graphics.Rect
 import android.provider.MediaStore
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.Toast
 import java.io.IOException
 import java.io.OutputStream
 
@@ -45,9 +44,10 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
     private fun analyzeUI(rootNode: AccessibilityNodeInfo?) {
         val results = StringBuilder()
+        val resultsWithIssues = StringBuilder()
 
         if (rootNode != null) {
-            analyzeNode(rootNode, results)
+            analyzeNode(rootNode, results, resultsWithIssues)
         } else {
             results.append("Root node is null, no views analyzed.")
         }
@@ -56,21 +56,21 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
         // Start OverlayService with the analysis result
         val overlayServiceIntent = Intent(this, OverlayService::class.java).apply {
-            putExtra("analysis_result", results.toString())
+            putExtra("analysis_result", resultsWithIssues.toString())
         }
         startService(overlayServiceIntent)
     }
 
-    private fun analyzeNode(node: AccessibilityNodeInfo, results: StringBuilder) {
+    private fun analyzeNode(node: AccessibilityNodeInfo, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val viewType = node.className.toString()
         val viewId = node.viewIdResourceName ?: "N/A"
 
         when (viewType) {
-            "android.widget.TextView" -> analyzeTextView(node, viewId, results)
-            "android.widget.Button" -> analyzeButton(node, viewId, results)
-            "android.widget.ImageView" -> analyzeImageView(node, viewId, results)
-            "android.widget.ImageButton" -> analyzeImageButton(node, viewId, results)
-            "android.widget.CheckBox" -> analyzeCheckBox(node, viewId, results)
+            "android.widget.TextView" -> analyzeTextView(node, viewId, results, resultsWithIssues)
+            "android.widget.Button" -> analyzeButton(node, viewId, results, resultsWithIssues)
+            "android.widget.ImageView" -> analyzeImageView(node, viewId, results, resultsWithIssues)
+            "android.widget.ImageButton" -> analyzeImageButton(node, viewId, results, resultsWithIssues)
+            "android.widget.CheckBox" -> analyzeCheckBox(node, viewId, results, resultsWithIssues)
             else -> {
                 // Analyze other view types if needed
             }
@@ -80,16 +80,12 @@ class UIQualityAccessibilityService : AccessibilityService() {
         for (i in 0 until node.childCount) {
             val child = node.getChild(i)
             if (child != null) {
-                analyzeNode(child, results)
+                analyzeNode(child, results, resultsWithIssues)
             }
         }
     }
 
-    private fun analyzeTextView(
-        node: AccessibilityNodeInfo,
-        viewId: String,
-        results: StringBuilder
-    ) {
+    private fun analyzeTextView(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val textColor = getTextColor(node)
         val backgroundColor = getBackgroundColor(node)
         val contrast = calculateContrast(textColor, backgroundColor)
@@ -100,12 +96,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (contrast < 4.5) { // Example threshold for contrast ratio
             results.append(" - Issue: Contrast is too low.\n")
             results.append(" - Suggestion: Increase contrast between text and background.\n")
+            resultsWithIssues.append("TextView: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: Contrast is too low.\n")
+            resultsWithIssues.append(" - Suggestion: Increase contrast between text and background.\n")
         }
 
-        checkSpacing(node, results)
+        checkSpacing(node, results, resultsWithIssues)
     }
 
-    private fun analyzeButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder) {
+    private fun analyzeButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
         val widthDp = convertPixelsToDp(bounds.width())
@@ -117,17 +116,20 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (widthDp < 48 || heightDp < 48) { // Check if either dimension is less than 48dp
             results.append(" - Issue: Touch target is too small.\n")
             results.append(" - Suggestion: Increase the button size to at least 48x48 dp.\n")
+            resultsWithIssues.append("Button: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: Touch target is too small.\n")
+            resultsWithIssues.append(" - Suggestion: Increase the button size to at least 48x48 dp.\n")
         }
 
-        checkSpacing(node, results)
+        checkSpacing(node, results, resultsWithIssues)
     }
 
-    private fun checkSpacing(node: AccessibilityNodeInfo, results: StringBuilder) {
+    private fun checkSpacing(node: AccessibilityNodeInfo, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val nodeBounds = Rect()
         node.getBoundsInScreen(nodeBounds)
 
         val minEdgeSpacingDp = 8
-        checkEdgeSpacing(nodeBounds, results, minEdgeSpacingDp)
+        checkEdgeSpacing(nodeBounds, results, resultsWithIssues, minEdgeSpacingDp)
 
         val parentNode = node.parent ?: return
         for (i in 0 until parentNode.childCount) {
@@ -143,11 +145,13 @@ class UIQualityAccessibilityService : AccessibilityService() {
             if (spacingDp < minEdgeSpacingDp) {
                 results.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
                 results.append(" - Suggestion: Increase spacing to at least 8 dp.\n")
+                resultsWithIssues.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
+                resultsWithIssues.append(" - Suggestion: Increase spacing to at least 8 dp.\n")
             }
         }
     }
 
-    private fun checkEdgeSpacing(nodeBounds: Rect, results: StringBuilder, minEdgeSpacingDp: Int) {
+    private fun checkEdgeSpacing(nodeBounds: Rect, results: StringBuilder, resultsWithIssues: StringBuilder, minEdgeSpacingDp: Int) {
         val leftSpacingDp = convertPixelsToDp(nodeBounds.left)
         val rightSpacingDp =
             convertPixelsToDp(resources.displayMetrics.widthPixels - nodeBounds.right)
@@ -158,21 +162,29 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (leftSpacingDp < minEdgeSpacingDp) {
             results.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
             results.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
+            resultsWithIssues.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
+            resultsWithIssues.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
         }
 
         if (rightSpacingDp < minEdgeSpacingDp) {
             results.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
             results.append(" - Suggestion: Increase spacing from the right edge to at least ${minEdgeSpacingDp}dp.\n")
+            resultsWithIssues.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
+            resultsWithIssues.append(" - Suggestion: Increase spacing from the right edge to at least ${minEdgeSpacingDp}dp.\n")
         }
 
         if (topSpacingDp < minEdgeSpacingDp) {
             results.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
             results.append(" - Suggestion: Increase spacing from the top edge to at least ${minEdgeSpacingDp}dp.\n")
+            resultsWithIssues.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
+            resultsWithIssues.append(" - Suggestion: Increase spacing from the top edge to at least ${minEdgeSpacingDp}dp.\n")
         }
 
         if (bottomSpacingDp < minEdgeSpacingDp) {
             results.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
             results.append(" - Suggestion: Increase spacing from the bottom edge to at least ${minEdgeSpacingDp}dp.\n")
+            resultsWithIssues.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
+            resultsWithIssues.append(" - Suggestion: Increase spacing from the bottom edge to at least ${minEdgeSpacingDp}dp.\n")
         }
     }
 
@@ -192,7 +204,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         return horizontalSpacing.coerceAtLeast(verticalSpacing)
     }
 
-    private fun analyzeImageView(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder) {
+    private fun analyzeImageView(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val contentDescription = node.contentDescription?.toString().orEmpty()
 
         results.append("ImageView found: ID=$viewId\n")
@@ -200,10 +212,13 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (contentDescription.isEmpty()) {
             results.append(" - Issue: Missing content description.\n")
             results.append(" - Suggestion: Add a content description for accessibility.\n")
+            resultsWithIssues.append("ImageView: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: Missing content description.\n")
+            resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
     }
 
-    private fun analyzeImageButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder) {
+    private fun analyzeImageButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val contentDescription = node.contentDescription?.toString().orEmpty()
 
         results.append("ImageButton found: ID=$viewId\n")
@@ -211,10 +226,13 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (contentDescription.isEmpty()) {
             results.append(" - Issue: Missing content description.\n")
             results.append(" - Suggestion: Add a content description for accessibility.\n")
+            resultsWithIssues.append("ImageButton: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: Missing content description.\n")
+            resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
     }
 
-    private fun analyzeCheckBox(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder) {
+    private fun analyzeCheckBox(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val contentDescription = node.contentDescription?.toString().orEmpty()
 
         results.append("CheckBox found: ID=$viewId\n")
@@ -222,6 +240,9 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (contentDescription.isEmpty()) {
             results.append(" - Issue: Missing content description.\n")
             results.append(" - Suggestion: Add a content description for accessibility.\n")
+            resultsWithIssues.append("CheckBox: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: Missing content description.\n")
+            resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
     }
 

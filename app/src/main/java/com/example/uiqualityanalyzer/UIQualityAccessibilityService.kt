@@ -46,6 +46,10 @@ class UIQualityAccessibilityService : AccessibilityService() {
         val results = StringBuilder()
         val resultsWithIssues = StringBuilder()
 
+        val fileName = "ui_analysis_results.csv"
+        val fileLocation = "Documents/$fileName"
+        resultsWithIssues.append("Analysis results have been saved to file: $fileLocation\n\n")
+
         if (rootNode != null) {
             analyzeNode(rootNode, results, resultsWithIssues)
         } else {

@@ -68,6 +68,9 @@ class UIQualityAccessibilityService : AccessibilityService() {
         when (viewType) {
             "android.widget.TextView" -> analyzeTextView(node, viewId, results)
             "android.widget.Button" -> analyzeButton(node, viewId, results)
+            "android.widget.ImageView" -> analyzeImageView(node, viewId, results)
+            "android.widget.ImageButton" -> analyzeImageButton(node, viewId, results)
+            "android.widget.CheckBox" -> analyzeCheckBox(node, viewId, results)
             else -> {
                 // Analyze other view types if needed
             }
@@ -187,6 +190,39 @@ class UIQualityAccessibilityService : AccessibilityService() {
         }
 
         return horizontalSpacing.coerceAtLeast(verticalSpacing)
+    }
+
+    private fun analyzeImageView(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder) {
+        val contentDescription = node.contentDescription?.toString().orEmpty()
+
+        results.append("ImageView found: ID=$viewId\n")
+
+        if (contentDescription.isEmpty()) {
+            results.append(" - Issue: Missing content description.\n")
+            results.append(" - Suggestion: Add a content description for accessibility.\n")
+        }
+    }
+
+    private fun analyzeImageButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder) {
+        val contentDescription = node.contentDescription?.toString().orEmpty()
+
+        results.append("ImageButton found: ID=$viewId\n")
+
+        if (contentDescription.isEmpty()) {
+            results.append(" - Issue: Missing content description.\n")
+            results.append(" - Suggestion: Add a content description for accessibility.\n")
+        }
+    }
+
+    private fun analyzeCheckBox(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder) {
+        val contentDescription = node.contentDescription?.toString().orEmpty()
+
+        results.append("CheckBox found: ID=$viewId\n")
+
+        if (contentDescription.isEmpty()) {
+            results.append(" - Issue: Missing content description.\n")
+            results.append(" - Suggestion: Add a content description for accessibility.\n")
+        }
     }
 
     private fun getTextColor(node: AccessibilityNodeInfo): Int {

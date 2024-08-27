@@ -2,11 +2,16 @@ package com.example.uiqualityanalyzer
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
+import android.provider.MediaStore
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
+import java.io.IOException
+import java.io.OutputStream
 
 class UIQualityAccessibilityService : AccessibilityService() {
 
@@ -21,9 +26,11 @@ class UIQualityAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
+            eventTypes =
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            flags =
+                AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         }
         serviceInfo = info
     }
@@ -44,6 +51,8 @@ class UIQualityAccessibilityService : AccessibilityService() {
         } else {
             results.append("Root node is null, no views analyzed.")
         }
+
+        saveResultsToCsv(results.toString())
 
         // Start OverlayService with the analysis result
         val overlayServiceIntent = Intent(this, OverlayService::class.java).apply {
@@ -73,7 +82,11 @@ class UIQualityAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun analyzeTextView(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder) {
+    private fun analyzeTextView(
+        node: AccessibilityNodeInfo,
+        viewId: String,
+        results: StringBuilder
+    ) {
         val textColor = getTextColor(node)
         val backgroundColor = getBackgroundColor(node)
         val contrast = calculateContrast(textColor, backgroundColor)
@@ -126,16 +139,18 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
             if (spacingDp < minEdgeSpacingDp) {
                 results.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
-                results.append(" - Suggestion: Increase spacing to at least 8dp.\n")
+                results.append(" - Suggestion: Increase spacing to at least 8 dp.\n")
             }
         }
     }
 
     private fun checkEdgeSpacing(nodeBounds: Rect, results: StringBuilder, minEdgeSpacingDp: Int) {
         val leftSpacingDp = convertPixelsToDp(nodeBounds.left)
-        val rightSpacingDp = convertPixelsToDp(resources.displayMetrics.widthPixels - nodeBounds.right)
+        val rightSpacingDp =
+            convertPixelsToDp(resources.displayMetrics.widthPixels - nodeBounds.right)
         val topSpacingDp = convertPixelsToDp(nodeBounds.top)
-        val bottomSpacingDp = convertPixelsToDp(resources.displayMetrics.heightPixels - nodeBounds.bottom)
+        val bottomSpacingDp =
+            convertPixelsToDp(resources.displayMetrics.heightPixels - nodeBounds.bottom)
 
         if (leftSpacingDp < minEdgeSpacingDp) {
             results.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
@@ -189,13 +204,80 @@ class UIQualityAccessibilityService : AccessibilityService() {
     }
 
     private fun calculateContrast(textColor: Int, backgroundColor: Int): Double {
-        val textLuminance = (0.2126 * Color.red(textColor) + 0.7152 * Color.green(textColor) + 0.0722 * Color.blue(textColor)) / 255.0
-        val backgroundLuminance = (0.2126 * Color.red(backgroundColor) + 0.7152 * Color.green(backgroundColor) + 0.0722 * Color.blue(backgroundColor)) / 255.0
+        val textLuminance =
+            (0.2126 * Color.red(textColor) + 0.7152 * Color.green(textColor) + 0.0722 * Color.blue(
+                textColor
+            )) / 255.0
+        val backgroundLuminance =
+            (0.2126 * Color.red(backgroundColor) + 0.7152 * Color.green(backgroundColor) + 0.0722 * Color.blue(
+                backgroundColor
+            )) / 255.0
 
         return if (textLuminance > backgroundLuminance) {
             (textLuminance + 0.05) / (backgroundLuminance + 0.05)
         } else {
             (backgroundLuminance + 0.05) / (textLuminance + 0.05)
+        }
+    }
+
+    private fun saveResultsToCsv(results: String) {
+        val fileName = "ui_analysis_results.csv"
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/")
+        }
+
+        val contentResolver = applicationContext.contentResolver
+        val uri = contentResolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
+
+        if (uri != null) {
+            var outputStream: OutputStream? = null
+            try {
+                outputStream = contentResolver.openOutputStream(uri)
+                outputStream?.bufferedWriter()?.use { writer ->
+                    writer.append("Element Type;ID;Issue;Suggestion\n")
+
+                    val lines = results.split("\n")
+
+                    var elementType = ""
+                    var elementId = ""
+                    var issue = ""
+                    var suggestion = ""
+
+                    for (line in lines) {
+                        when {
+                            line.contains("found:") -> {
+                                if (elementType.isNotEmpty()) {
+                                    writer.append("$elementType;$elementId;$issue;$suggestion\n")
+                                }
+                                elementType = line.substringBefore(" found:").trim()
+                                elementId = line.substringAfter("ID=").substringBefore("\n").trim()
+                                issue = ""
+                                suggestion = ""
+                            }
+                            line.contains("Issue:") -> {
+                                issue = line.substringAfter("Issue:").trim()
+                            }
+                            line.contains("Suggestion:") -> {
+                                suggestion = line.substringAfter("Suggestion:").trim()
+                            }
+                        }
+                    }
+
+                    if (elementType.isNotEmpty() || elementId.isNotEmpty() || issue.isNotEmpty() || suggestion.isNotEmpty()) {
+                        writer.append("$elementType;$elementId;$issue;$suggestion\n")
+                    }
+                }
+            } catch (e: IOException) {
+                e.printStackTrace()
+            } finally {
+                try {
+                    outputStream?.close()
+                } catch (e: IOException) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 }

@@ -91,19 +91,17 @@ class UIQualityAccessibilityService : AccessibilityService() {
     }
 
     private fun analyzeTextView(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
-        val textColor = getTextColor(node)
-        val backgroundColor = getBackgroundColor(node)
-        val contrast = calculateContrast(textColor, backgroundColor)
+        val text = node.text?.toString().orEmpty()
 
         results.append("TextView found: ID=$viewId\n")
-        results.append(" - Contrast ratio: ${"%.2f".format(contrast)}\n")
+        results.append(" - Text: $text\n")
 
-        if (contrast < 4.5) { // Example threshold for contrast ratio
-            results.append(" - Issue: Contrast is too low.\n")
-            results.append(" - Suggestion: Increase contrast between text and background.\n")
+        if (text.isEmpty()) {
+            results.append(" - Issue: TextView is empty.\n")
+            results.append(" - Suggestion: Add descriptive text to the TextView.\n")
             resultsWithIssues.append("TextView: ID=$viewId\n")
-            resultsWithIssues.append(" - Issue: Contrast is too low.\n")
-            resultsWithIssues.append(" - Suggestion: Increase contrast between text and background.\n")
+            resultsWithIssues.append(" - Issue: TextView is empty.\n")
+            resultsWithIssues.append(" - Suggestion: Add descriptive text to the TextView.\n")
         }
     }
 
@@ -207,6 +205,10 @@ class UIQualityAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun convertPixelsToDp(px: Int): Float {
+        return px / resources.displayMetrics.density
+    }
+
     private fun calculateSpacing(bounds1: Rect, bounds2: Rect): Int {
         val horizontalSpacing = when {
             bounds1.right <= bounds2.left -> bounds2.left - bounds1.right
@@ -262,37 +264,6 @@ class UIQualityAccessibilityService : AccessibilityService() {
             resultsWithIssues.append("CheckBox: ID=$viewId\n")
             resultsWithIssues.append(" - Issue: Missing content description.\n")
             resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
-        }
-    }
-
-    private fun getTextColor(node: AccessibilityNodeInfo): Int {
-        // Placeholder for text color retrieval
-        return Color.BLACK // Default value, adjust as needed
-    }
-
-    private fun getBackgroundColor(node: AccessibilityNodeInfo): Int {
-        // Placeholder for background color retrieval
-        return Color.WHITE // Default value, adjust as needed
-    }
-
-    private fun convertPixelsToDp(px: Int): Float {
-        return px / resources.displayMetrics.density
-    }
-
-    private fun calculateContrast(textColor: Int, backgroundColor: Int): Double {
-        val textLuminance =
-            (0.2126 * Color.red(textColor) + 0.7152 * Color.green(textColor) + 0.0722 * Color.blue(
-                textColor
-            )) / 255.0
-        val backgroundLuminance =
-            (0.2126 * Color.red(backgroundColor) + 0.7152 * Color.green(backgroundColor) + 0.0722 * Color.blue(
-                backgroundColor
-            )) / 255.0
-
-        return if (textLuminance > backgroundLuminance) {
-            (textLuminance + 0.05) / (backgroundLuminance + 0.05)
-        } else {
-            (backgroundLuminance + 0.05) / (textLuminance + 0.05)
         }
     }
 

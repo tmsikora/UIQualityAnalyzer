@@ -71,6 +71,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
         when (viewType) {
             "android.widget.TextView" -> analyzeTextView(node, viewId, results, resultsWithIssues)
+            "android.widget.EditText" -> analyzeEditText(node, viewId, results, resultsWithIssues)
             "android.widget.Button" -> analyzeButton(node, viewId, results, resultsWithIssues)
             "android.widget.ImageView" -> analyzeImageView(node, viewId, results, resultsWithIssues)
             "android.widget.ImageButton" -> analyzeImageButton(node, viewId, results, resultsWithIssues)
@@ -104,8 +105,20 @@ class UIQualityAccessibilityService : AccessibilityService() {
             resultsWithIssues.append(" - Issue: Contrast is too low.\n")
             resultsWithIssues.append(" - Suggestion: Increase contrast between text and background.\n")
         }
+    }
 
-        checkSpacing(node, results, resultsWithIssues)
+    private fun analyzeEditText(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+        val hint = node.text ?: node.hintText
+
+        results.append("EditText found: ID=$viewId\n")
+
+        if (hint.isNullOrEmpty()) {
+            results.append(" - Issue: EditText is missing a hint.\n")
+            results.append(" - Suggestion: Add a hint to the EditText to provide context to users.\n")
+            resultsWithIssues.append("EditText: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: EditText is missing a hint.\n")
+            resultsWithIssues.append(" - Suggestion: Add a hint to the EditText to provide context to users.\n")
+        }
     }
 
     private fun analyzeButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
@@ -125,15 +138,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
             resultsWithIssues.append(" - Suggestion: Increase the button size to at least 48x48 dp.\n")
         }
 
-        checkSpacing(node, results, resultsWithIssues)
+        checkSpacing(node, viewId, results, resultsWithIssues)
     }
 
-    private fun checkSpacing(node: AccessibilityNodeInfo, results: StringBuilder, resultsWithIssues: StringBuilder) {
+    private fun checkSpacing(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val nodeBounds = Rect()
         node.getBoundsInScreen(nodeBounds)
 
         val minEdgeSpacingDp = 8
-        checkEdgeSpacing(nodeBounds, results, resultsWithIssues, minEdgeSpacingDp)
+        checkEdgeSpacing(nodeBounds, viewId, results, resultsWithIssues, minEdgeSpacingDp)
 
         val parentNode = node.parent ?: return
         for (i in 0 until parentNode.childCount) {
@@ -149,13 +162,14 @@ class UIQualityAccessibilityService : AccessibilityService() {
             if (spacingDp < minEdgeSpacingDp) {
                 results.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
                 results.append(" - Suggestion: Increase spacing to at least 8 dp.\n")
+                resultsWithIssues.append("Button: ID=$viewId\n")
                 resultsWithIssues.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
                 resultsWithIssues.append(" - Suggestion: Increase spacing to at least 8 dp.\n")
             }
         }
     }
 
-    private fun checkEdgeSpacing(nodeBounds: Rect, results: StringBuilder, resultsWithIssues: StringBuilder, minEdgeSpacingDp: Int) {
+    private fun checkEdgeSpacing(nodeBounds: Rect, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder, minEdgeSpacingDp: Int) {
         val leftSpacingDp = convertPixelsToDp(nodeBounds.left)
         val rightSpacingDp =
             convertPixelsToDp(resources.displayMetrics.widthPixels - nodeBounds.right)
@@ -166,6 +180,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (leftSpacingDp < minEdgeSpacingDp) {
             results.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
             results.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
+            resultsWithIssues.append("Button: ID=$viewId\n")
             resultsWithIssues.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
             resultsWithIssues.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
         }

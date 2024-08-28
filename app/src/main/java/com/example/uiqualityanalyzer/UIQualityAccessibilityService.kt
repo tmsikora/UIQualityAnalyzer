@@ -337,6 +337,8 @@ class UIQualityAccessibilityService : AccessibilityService() {
         }
 
         contentDescriptionScores.add(if (contentDescription.isEmpty()) 0f else 100f)
+
+        checkSpacing(node, viewId, results, resultsWithIssues)
     }
 
     private fun calculateTouchAreaScore(): Float {

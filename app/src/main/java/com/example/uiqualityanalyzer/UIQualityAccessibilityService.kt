@@ -259,18 +259,26 @@ class UIQualityAccessibilityService : AccessibilityService() {
             spacings.forEachIndexed { index, spacing ->
                 when (index) {
                     0 -> if (spacing < minEdgeSpacingDp) {
+                        results.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
+                        results.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
                         resultsWithIssues.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
                         resultsWithIssues.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
                     }
                     1 -> if (spacing < minEdgeSpacingDp) {
+                        results.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
+                        results.append(" - Suggestion: Increase spacing from the right edge to at least ${minEdgeSpacingDp}dp.\n")
                         resultsWithIssues.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
                         resultsWithIssues.append(" - Suggestion: Increase spacing from the right edge to at least ${minEdgeSpacingDp}dp.\n")
                     }
                     2 -> if (spacing < minEdgeSpacingDp) {
+                        results.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
+                        results.append(" - Suggestion: Increase spacing from the top edge to at least ${minEdgeSpacingDp}dp.\n")
                         resultsWithIssues.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
                         resultsWithIssues.append(" - Suggestion: Increase spacing from the top edge to at least ${minEdgeSpacingDp}dp.\n")
                     }
                     3 -> if (spacing < minEdgeSpacingDp) {
+                        results.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
+                        results.append(" - Suggestion: Increase spacing from the bottom edge to at least ${minEdgeSpacingDp}dp.\n")
                         resultsWithIssues.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
                         resultsWithIssues.append(" - Suggestion: Increase spacing from the bottom edge to at least ${minEdgeSpacingDp}dp.\n")
                     }
@@ -390,9 +398,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
             try {
                 outputStream = contentResolver.openOutputStream(uri)
                 outputStream?.bufferedWriter()?.use { writer ->
-                    writer.append("Element Type;ID;Issue;Suggestion\n")
+                    writer.append("Element Type;ID;Issue;Suggestion;;;TouchAreaScore;ElementSpacingScore;EdgeSpacingScore;ContentDescriptionScore;HintTextScore\n")
 
                     val lines = results.split("\n")
+                    // Indexes for accessing the score lists
+                    var touchAreaScoresIndex = 0
+                    var elementSpacingScoresIndex = 0
+                    var edgeSpacingScoresIndex = 0
+                    var contentDescriptionScoresIndex = 0
+                    var hintTextScoresIndex = 0
 
                     var elementType = ""
                     var elementId = ""
@@ -403,7 +417,33 @@ class UIQualityAccessibilityService : AccessibilityService() {
                         when {
                             line.contains("found:") -> {
                                 if (elementType.isNotEmpty()) {
-                                    writer.append("$elementType;$elementId;$issue;$suggestion\n")
+                                    // Get the scores from the lists
+                                    val touchAreaScore = if (elementType == "Button") touchAreaScores.getOrNull(touchAreaScoresIndex) ?: "" else ""
+                                    if (elementType == "Button") {
+                                        touchAreaScoresIndex++
+                                    }
+
+                                    val elementSpacingScore = if (elementType == "Button" || elementType == "CheckBox") elementSpacingScores.getOrNull(elementSpacingScoresIndex) ?: "" else ""
+                                    if (elementType == "Button" || elementType == "CheckBox") {
+                                        elementSpacingScoresIndex++
+                                    }
+
+                                    val edgeSpacingScore = if (elementType == "Button" || elementType == "CheckBox") edgeSpacingScores.getOrNull(edgeSpacingScoresIndex) ?: "" else ""
+                                    if (elementType == "Button" || elementType == "CheckBox") {
+                                        edgeSpacingScoresIndex++
+                                    }
+
+                                    val contentDescriptionScore = if (elementType == "CheckBox" || elementType == "ImageView" || elementType == "ImageButton") contentDescriptionScores.getOrNull(contentDescriptionScoresIndex) ?: "" else ""
+                                    if (elementType == "CheckBox" || elementType == "ImageView" || elementType == "ImageButton") {
+                                        contentDescriptionScoresIndex++
+                                    }
+
+                                    val hintTextScore = if (elementType == "EditText") hintTextScores.getOrNull(hintTextScoresIndex) ?: "" else ""
+                                    if (elementType == "EditText") {
+                                        hintTextScoresIndex++
+                                    }
+
+                                    writer.append("$elementType;$elementId;$issue;$suggestion;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
                                 }
                                 elementType = line.substringBefore(" found:").trim()
                                 elementId = line.substringAfter("ID=").substringBefore("\n").trim()
@@ -420,8 +460,33 @@ class UIQualityAccessibilityService : AccessibilityService() {
                     }
 
                     if (elementType.isNotEmpty() || elementId.isNotEmpty() || issue.isNotEmpty() || suggestion.isNotEmpty()) {
-                        writer.append("$elementType;$elementId;$issue;$suggestion\n")
+                        // Get the scores for the last element
+                        val touchAreaScore = touchAreaScores.getOrNull(touchAreaScoresIndex) ?: ""
+                        val elementSpacingScore = elementSpacingScores.getOrNull(elementSpacingScoresIndex) ?: ""
+                        val edgeSpacingScore = edgeSpacingScores.getOrNull(edgeSpacingScoresIndex) ?: ""
+                        val contentDescriptionScore = contentDescriptionScores.getOrNull(contentDescriptionScoresIndex) ?: ""
+                        val hintTextScore = hintTextScores.getOrNull(hintTextScoresIndex) ?: ""
+
+                        writer.append("$elementType;$elementId;$issue;$suggestion;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
                     }
+
+                    val touchAreaScore = calculateTouchAreaScore()
+                    val elementSpacingScore = calculateElementSpacingScore()
+                    val edgeSpacingScore = calculateEdgeSpacingScore()
+                    val contentDescriptionScore = calculateContentDescriptionScore()
+                    val hintTextScore = calculateHintTextScore()
+                    val finalScore = (
+                            (touchAreaScore * 0.2) +
+                                    (elementSpacingScore * 0.2) +
+                                    (edgeSpacingScore * 0.2) +
+                                    (contentDescriptionScore * 0.2) +
+                                    (hintTextScore * 0.2)
+                            )
+
+                    writer.append(";;;;;Average scores:")
+                    writer.append(";$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore\n")
+                    writer.append(";;;;;UI Quality Score:;" + String.format("%.2f", finalScore))
+                    writer.append("\n")
                 }
             } catch (e: IOException) {
                 e.printStackTrace()

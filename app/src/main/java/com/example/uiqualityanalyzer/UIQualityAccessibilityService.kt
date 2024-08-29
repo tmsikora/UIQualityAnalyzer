@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.io.IOException
 import java.io.OutputStream
+import kotlin.math.max
 
 class UIQualityAccessibilityService : AccessibilityService() {
 
@@ -49,6 +50,13 @@ class UIQualityAccessibilityService : AccessibilityService() {
     }
 
     private fun analyzeUI(rootNode: AccessibilityNodeInfo?) {
+        // Clear previous scores
+        touchAreaScores.clear()
+        elementSpacingScores.clear()
+        edgeSpacingScores.clear()
+        contentDescriptionScores.clear()
+        hintTextScores.clear()
+
         val results = StringBuilder()
         val resultsWithIssues = StringBuilder()
 
@@ -234,7 +242,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         var minScore = 100f
 
         spacings.forEach { spacing ->
-            val score = if (spacing >= minEdgeSpacingDp) 100f else (spacing / minEdgeSpacingDp) * 100
+            val score = if (spacing >= minEdgeSpacingDp) 100f else ((spacing / minEdgeSpacingDp.coerceAtLeast(1)) * 100f).coerceAtLeast(0f)
             Log.d("EdgeSpacingScores", "Spacing: $spacing dp, Score: $score")
 
             if (score < minScore) {
@@ -288,7 +296,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
             else -> 0
         }
 
-        return horizontalSpacing.coerceAtLeast(verticalSpacing)
+        return max(horizontalSpacing, verticalSpacing).coerceAtLeast(0)
     }
 
     private fun analyzeImageView(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {

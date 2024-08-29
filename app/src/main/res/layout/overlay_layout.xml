@@ -19,11 +19,18 @@
         android:text="Minimize Results"
         android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/analysis_text"
+    <ScrollView
+        android:id="@+id/scroll_view_analysis"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@android:color/white"
-        android:textSize="14sp"
-        android:paddingTop="10dp"/>
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/analysis_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:paddingTop="10dp"/>
+    </ScrollView>
 </LinearLayout>

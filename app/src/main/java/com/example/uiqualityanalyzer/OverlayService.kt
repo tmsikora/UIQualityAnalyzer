@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.ScrollView
 import android.widget.TextView
 
 class OverlayService : Service() {
@@ -17,6 +18,7 @@ class OverlayService : Service() {
     private lateinit var overlayView: View
     private lateinit var analysisTextView: TextView
     private lateinit var minimizeResultsButton: Button
+    private lateinit var scrollViewAnalysis: ScrollView
     private var isMinimized = false
 
     override fun onCreate() {
@@ -29,6 +31,7 @@ class OverlayService : Service() {
         overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null)
         analysisTextView = overlayView.findViewById(R.id.analysis_text)
         minimizeResultsButton = overlayView.findViewById(R.id.minimize_results_button)
+        scrollViewAnalysis = overlayView.findViewById(R.id.scroll_view_analysis)
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -71,18 +74,19 @@ class OverlayService : Service() {
 
     fun updateOverlayContent(analysisResult: String) {
         analysisTextView.text = analysisResult
-        analysisTextView.visibility = View.VISIBLE
+        scrollViewAnalysis.visibility = View.VISIBLE
         minimizeResultsButton.visibility = View.VISIBLE
+        minimizeResultsButton.text = "Minimize Results"
         isMinimized = false
     }
 
     private fun toggleResultsVisibility() {
         if (::analysisTextView.isInitialized && ::minimizeResultsButton.isInitialized) {
             if (isMinimized) {
-                analysisTextView.visibility = View.VISIBLE
+                scrollViewAnalysis.visibility = View.VISIBLE
                 minimizeResultsButton.text = "Minimize Results"
             } else {
-                analysisTextView.visibility = View.GONE
+                scrollViewAnalysis.visibility = View.GONE
                 minimizeResultsButton.text = "Show Results"
             }
             isMinimized = !isMinimized

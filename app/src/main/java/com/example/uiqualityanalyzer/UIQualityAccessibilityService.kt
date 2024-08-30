@@ -2,6 +2,7 @@ package com.example.uiqualityanalyzer
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Rect
@@ -20,6 +21,20 @@ class UIQualityAccessibilityService : AccessibilityService() {
     private val edgeSpacingScores = mutableListOf<Float>()
     private val contentDescriptionScores = mutableListOf<Float>()
     private val hintTextScores = mutableListOf<Float>()
+
+    // Set coefficients
+    private val touchAreaScoreCoefficient = 0.3f
+    private val elementSpacingScoreCoefficient = 0.2f
+    private val edgeSpacingScoreCoefficient = 0.2f
+    private val contentDescriptionScoreCoefficient = 0.15f
+    private val hintTextScoreCoefficient = 0.15f
+
+    private var touchAreaScore = 0.0f
+    private var elementSpacingScore = 0.0f
+    private var edgeSpacingScore = 0.0f
+    private var contentDescriptionScore = 0.0f
+    private var hintTextScore = 0.0f
+    private var finalScore = 0.0f
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // Handle accessibility events if needed
@@ -49,6 +64,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         return super.onStartCommand(intent, flags, startId)
     }
 
+    @SuppressLint("DefaultLocale")
     private fun analyzeUI(rootNode: AccessibilityNodeInfo?) {
         // Clear previous scores
         touchAreaScores.clear()
@@ -56,6 +72,12 @@ class UIQualityAccessibilityService : AccessibilityService() {
         edgeSpacingScores.clear()
         contentDescriptionScores.clear()
         hintTextScores.clear()
+        touchAreaScore = 0.0f
+        elementSpacingScore = 0.0f
+        edgeSpacingScore = 0.0f
+        contentDescriptionScore = 0.0f
+        hintTextScore = 0.0f
+        finalScore = 0.0f
 
         val results = StringBuilder()
         val resultsWithIssues = StringBuilder()
@@ -71,19 +93,19 @@ class UIQualityAccessibilityService : AccessibilityService() {
         }
 
         // Calculate scores
-        val touchAreaScore = calculateTouchAreaScore()
-        val elementSpacingScore = calculateElementSpacingScore()
-        val edgeSpacingScore = calculateEdgeSpacingScore()
-        val contentDescriptionScore = calculateContentDescriptionScore()
-        val hintTextScore = calculateHintTextScore()
+        touchAreaScore = calculateTouchAreaScore()
+        elementSpacingScore = calculateElementSpacingScore()
+        edgeSpacingScore = calculateEdgeSpacingScore()
+        contentDescriptionScore = calculateContentDescriptionScore()
+        hintTextScore = calculateHintTextScore()
 
         // Calculate final score
-        val finalScore = (
-                (touchAreaScore * 0.2) +
-                        (elementSpacingScore * 0.2) +
-                        (edgeSpacingScore * 0.2) +
-                        (contentDescriptionScore * 0.2) +
-                        (hintTextScore * 0.2)
+        finalScore = (
+                (touchAreaScore * touchAreaScoreCoefficient) +
+                        (elementSpacingScore * elementSpacingScoreCoefficient) +
+                        (edgeSpacingScore * edgeSpacingScoreCoefficient) +
+                        (contentDescriptionScore * contentDescriptionScoreCoefficient) +
+                        (hintTextScore * hintTextScoreCoefficient)
                 )
 
         Log.i("UIQualityAnalyzer", "touchAreaScore: $touchAreaScore%")
@@ -190,11 +212,12 @@ class UIQualityAccessibilityService : AccessibilityService() {
         val nodeBounds = Rect()
         node.getBoundsInScreen(nodeBounds)
 
-        val minEdgeSpacingDp = 8
-        checkEdgeSpacing(nodeBounds, viewId, results, resultsWithIssues, minEdgeSpacingDp)
+        val minElementSpacingDp = 8
+
+        checkEdgeSpacing(nodeBounds, viewId, results, resultsWithIssues)
 
         val parentNode = node.parent ?: return
-        var spacingScores = mutableListOf<Float>()
+        val spacingScores = mutableListOf<Float>()
 
         for (i in 0 until parentNode.childCount) {
             val sibling = parentNode.getChild(i) ?: continue
@@ -206,11 +229,11 @@ class UIQualityAccessibilityService : AccessibilityService() {
             val spacing = calculateSpacing(nodeBounds, siblingBounds)
             val spacingDp = convertPixelsToDp(spacing)
 
-            val spacingScore = if (spacingDp >= minEdgeSpacingDp) 100f else (spacingDp / minEdgeSpacingDp) * 100
+            val spacingScore = if (spacingDp >= minElementSpacingDp) 100f else (spacingDp / minElementSpacingDp) * 100
             spacingScores.add(spacingScore)
             Log.d("ElementSpacingScores", "Sibling spacing: $spacingDp dp, Score: $spacingScore")
 
-            if (spacingDp < minEdgeSpacingDp) {
+            if (spacingDp < minElementSpacingDp) {
                 results.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
                 results.append(" - Suggestion: Increase spacing to at least 8 dp.\n")
                 resultsWithIssues.append("Button: ID=$viewId\n")
@@ -229,7 +252,9 @@ class UIQualityAccessibilityService : AccessibilityService() {
         elementSpacingScores.add(finalSpacingScore)
     }
 
-    private fun checkEdgeSpacing(nodeBounds: Rect, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder, minEdgeSpacingDp: Int) {
+    private fun checkEdgeSpacing(nodeBounds: Rect, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+        val minEdgeSpacingDp = 16
+
         val leftSpacingDp = convertPixelsToDp(nodeBounds.left)
         val rightSpacingDp =
             convertPixelsToDp(resources.displayMetrics.widthPixels - nodeBounds.right)
@@ -260,27 +285,27 @@ class UIQualityAccessibilityService : AccessibilityService() {
                 when (index) {
                     0 -> if (spacing < minEdgeSpacingDp) {
                         results.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
-                        results.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
+                        results.append(" - Suggestion: Increase spacing from the left edge to at least $minEdgeSpacingDp dp.\n")
                         resultsWithIssues.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
-                        resultsWithIssues.append(" - Suggestion: Increase spacing from the left edge to at least ${minEdgeSpacingDp}dp.\n")
+                        resultsWithIssues.append(" - Suggestion: Increase spacing from the left edge to at least $minEdgeSpacingDp dp.\n")
                     }
                     1 -> if (spacing < minEdgeSpacingDp) {
                         results.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
-                        results.append(" - Suggestion: Increase spacing from the right edge to at least ${minEdgeSpacingDp}dp.\n")
+                        results.append(" - Suggestion: Increase spacing from the right edge to at least $minEdgeSpacingDp dp.\n")
                         resultsWithIssues.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
-                        resultsWithIssues.append(" - Suggestion: Increase spacing from the right edge to at least ${minEdgeSpacingDp}dp.\n")
+                        resultsWithIssues.append(" - Suggestion: Increase spacing from the right edge to at least $minEdgeSpacingDp dp.\n")
                     }
                     2 -> if (spacing < minEdgeSpacingDp) {
                         results.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
-                        results.append(" - Suggestion: Increase spacing from the top edge to at least ${minEdgeSpacingDp}dp.\n")
+                        results.append(" - Suggestion: Increase spacing from the top edge to at least $minEdgeSpacingDp dp.\n")
                         resultsWithIssues.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
-                        resultsWithIssues.append(" - Suggestion: Increase spacing from the top edge to at least ${minEdgeSpacingDp}dp.\n")
+                        resultsWithIssues.append(" - Suggestion: Increase spacing from the top edge to at least $minEdgeSpacingDp dp.\n")
                     }
                     3 -> if (spacing < minEdgeSpacingDp) {
                         results.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
-                        results.append(" - Suggestion: Increase spacing from the bottom edge to at least ${minEdgeSpacingDp}dp.\n")
+                        results.append(" - Suggestion: Increase spacing from the bottom edge to at least $minEdgeSpacingDp dp.\n")
                         resultsWithIssues.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
-                        resultsWithIssues.append(" - Suggestion: Increase spacing from the bottom edge to at least ${minEdgeSpacingDp}dp.\n")
+                        resultsWithIssues.append(" - Suggestion: Increase spacing from the bottom edge to at least $minEdgeSpacingDp dp.\n")
                     }
                 }
             }
@@ -382,6 +407,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         return if (hintTextScores.isEmpty()) 100f else hintTextScores.average().toFloat()
     }
 
+    @SuppressLint("DefaultLocale")
     private fun saveResultsToCsv(results: String) {
         val fileName = "ui_analysis_results.csv"
         val contentValues = ContentValues().apply {
@@ -470,21 +496,16 @@ class UIQualityAccessibilityService : AccessibilityService() {
                         writer.append("$elementType;$elementId;$issue;$suggestion;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
                     }
 
-                    val touchAreaScore = calculateTouchAreaScore()
-                    val elementSpacingScore = calculateElementSpacingScore()
-                    val edgeSpacingScore = calculateEdgeSpacingScore()
-                    val contentDescriptionScore = calculateContentDescriptionScore()
-                    val hintTextScore = calculateHintTextScore()
-                    val finalScore = (
-                            (touchAreaScore * 0.2) +
-                                    (elementSpacingScore * 0.2) +
-                                    (edgeSpacingScore * 0.2) +
-                                    (contentDescriptionScore * 0.2) +
-                                    (hintTextScore * 0.2)
-                            )
-
                     writer.append(";;;;;Average scores:")
-                    writer.append(";$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore\n")
+                    writer.append(";" +
+                            String.format("%.2f", touchAreaScore) + ";" +
+                            String.format("%.2f", elementSpacingScore) + ";" +
+                            String.format("%.2f", edgeSpacingScore) + ";" +
+                            String.format("%.2f", contentDescriptionScore) + ";" +
+                            String.format("%.2f", hintTextScore) + "\n"
+                    )
+                    writer.append(";;;;;Coefficients:")
+                    writer.append(";$touchAreaScoreCoefficient;$elementSpacingScoreCoefficient;$edgeSpacingScoreCoefficient;$contentDescriptionScoreCoefficient;$hintTextScoreCoefficient\n")
                     writer.append(";;;;;UI Quality Score:;" + String.format("%.2f", finalScore))
                     writer.append("\n")
                 }

@@ -35,6 +35,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
     private var contentDescriptionScore = 0.0f
     private var hintTextScore = 0.0f
     private var finalScore = 0.0f
+    private var finalMinimalScore = 0.0f
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // Handle accessibility events if needed
@@ -78,13 +79,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
         contentDescriptionScore = 0.0f
         hintTextScore = 0.0f
         finalScore = 0.0f
+        finalMinimalScore = 0.0f
 
         val results = StringBuilder()
         val resultsWithIssues = StringBuilder()
 
         val fileName = "ui_analysis_results.csv"
         val fileLocation = "Documents/$fileName"
-        resultsWithIssues.append("Analysis results have been saved to file: $fileLocation\n\n")
+        resultsWithIssues.append("‣ Both scores are in 0-1 scale, where 0 is the lowest score and 1 is the highest.\n\n\n")
+        resultsWithIssues.append("‣ Analysis results have been saved to file: $fileLocation\n\n\n")
         resultsWithIssues.append("List of identified issues:\n")
 
         if (rootNode != null) {
@@ -109,15 +112,35 @@ class UIQualityAccessibilityService : AccessibilityService() {
                         (hintTextScore * hintTextScoreCoefficient)
                 )
 
+        val minTouchAreaScore = touchAreaScores.minOrNull() ?: 0.0f
+        val minElementSpacingScore = elementSpacingScores.minOrNull() ?: 0.0f
+        val minEdgeSpacingScore = edgeSpacingScores.minOrNull() ?: 0.0f
+        val minContentDescriptionScore = contentDescriptionScores.minOrNull() ?: 0.0f
+        val minHintTextScore = hintTextScores.minOrNull() ?: 0.0f
+
+        // Calculate final minimal score
+        finalMinimalScore = (
+                (minTouchAreaScore * touchAreaScoreCoefficient) +
+                        (minElementSpacingScore * elementSpacingScoreCoefficient) +
+                        (minEdgeSpacingScore * edgeSpacingScoreCoefficient) +
+                        (minContentDescriptionScore * contentDescriptionScoreCoefficient) +
+                        (minHintTextScore * hintTextScoreCoefficient)
+                )
+
         Log.i("UIQualityAnalyzer", "touchAreaScore: $touchAreaScore%")
         Log.i("UIQualityAnalyzer", "elementSpacingScore: $elementSpacingScore%")
         Log.i("UIQualityAnalyzer", "edgeSpacingScore: $edgeSpacingScore%")
         Log.i("UIQualityAnalyzer", "contentDescriptionScore: $contentDescriptionScore%")
         Log.i("UIQualityAnalyzer", "hintTextScore: $hintTextScore%")
 
+        val formattedMinimalScore = String.format("%.3f", finalMinimalScore)
+        results.append(0, "UI Quality Minimal Score: $formattedMinimalScore%\n\n")
+        resultsWithIssues.insert(0, "UI Quality Minimal Score: $formattedMinimalScore\n(calculated from multiplication of lowest quality parameter values and their coefficients)\n\n")
+        Log.i("UIQualityAnalyzer", "Final UI Quality Minimal Score: $finalMinimalScore%")
+
         val formattedScore = String.format("%.3f", finalScore)
         results.append(0, "UI Quality Score: $formattedScore%\n\n")
-        resultsWithIssues.insert(0, "UI Quality Score: $formattedScore\n(calculated in 0-1 scale, where 0 is the lowest score and 1 is the highest)\n\n")
+        resultsWithIssues.insert(0, "UI Quality Score: $formattedScore\n(calculated from multiplication of average quality parameter scores and their coefficients)\n\n")
         Log.i("UIQualityAnalyzer", "Final UI Quality Score: $finalScore%")
 
         saveResultsToCsv(results.toString())
@@ -131,15 +154,16 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
     private fun analyzeNode(node: AccessibilityNodeInfo, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val viewType = node.className.toString()
+        val viewTypeName = node.className.toString().substringAfterLast('.')
         val viewId = node.viewIdResourceName ?: "N/A"
 
         when (viewType) {
             "android.widget.TextView" -> analyzeTextView(node, viewId, results, resultsWithIssues)
             "android.widget.EditText" -> analyzeEditText(node, viewId, results, resultsWithIssues)
-            "android.widget.Button" -> analyzeButton(node, viewId, results, resultsWithIssues)
+            "android.widget.Button" -> analyzeButton(node, viewId, viewTypeName, results, resultsWithIssues)
             "android.widget.ImageView" -> analyzeImageView(node, viewId, results, resultsWithIssues)
-            "android.widget.ImageButton" -> analyzeImageButton(node, viewId, results, resultsWithIssues)
-            "android.widget.CheckBox" -> analyzeCheckBox(node, viewId, results, resultsWithIssues)
+            "android.widget.ImageButton" -> analyzeImageButton(node, viewId, viewTypeName, results, resultsWithIssues)
+            "android.widget.CheckBox" -> analyzeCheckBox(node, viewId, viewTypeName, results, resultsWithIssues)
             else -> {
                 // Analyze other view types if needed
             }
@@ -163,59 +187,46 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (text.isEmpty()) {
             results.append(" - Issue: TextView is empty.\n")
             results.append(" - Suggestion: Add descriptive text to the TextView.\n")
-            resultsWithIssues.append("TextView: ID=$viewId\n")
+            resultsWithIssues.append("• TextView: ID=$viewId\n")
             resultsWithIssues.append(" - Issue: TextView is empty.\n")
-            resultsWithIssues.append(" - Suggestion: Add descriptive text to the TextView.\n")
+            resultsWithIssues.append(" - Suggestion: Add descriptive text to the text attribute.\n")
         }
     }
 
-    private fun analyzeEditText(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
-        val hint = node.text ?: node.hintText
+    private fun analyzeButton(node: AccessibilityNodeInfo, viewId: String, viewTypeName: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+        results.append("Button found: ID=$viewId\n")
 
-        results.append("EditText found: ID=$viewId\n")
-
-        if (hint.isNullOrEmpty()) {
-            results.append(" - Issue: EditText is missing a hint.\n")
-            results.append(" - Suggestion: Add a hint to the EditText to provide context to users.\n")
-            resultsWithIssues.append("EditText: ID=$viewId\n")
-            resultsWithIssues.append(" - Issue: EditText is missing a hint.\n")
-            resultsWithIssues.append(" - Suggestion: Add a hint to the EditText to provide context to users.\n")
-        }
-
-        // Calculate hint text score
-        hintTextScores.add(if (hint.isNullOrEmpty()) 0.0f else 1.0f)
+        checkTouchArea(node, viewId, viewTypeName, results, resultsWithIssues)
+        checkSpacing(node, viewId, viewTypeName, results, resultsWithIssues)
     }
 
-    private fun analyzeButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+    private fun checkTouchArea(node: AccessibilityNodeInfo, viewId: String, viewTypeName: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
         val widthDp = convertPixelsToDp(bounds.width())
         val heightDp = convertPixelsToDp(bounds.height())
 
-        results.append("Button found: ID=$viewId\n")
         results.append(" - Width: $widthDp dp, Height: $heightDp dp\n")
 
         val areaScore = if (widthDp >= 48 && heightDp >= 48) 1.0f else (widthDp * heightDp / (48 * 48))
         touchAreaScores.add(areaScore)
 
         if (widthDp < 48 || heightDp < 48) { // Check if either dimension is less than 48dp
-            results.append(" - Issue: Touch target is too small.\n")
+            results.append(" - Issue: Touch target is too small (${widthDp}x${heightDp} dp).\n")
             results.append(" - Suggestion: Increase the button size to at least 48x48 dp.\n")
-            resultsWithIssues.append("Button: ID=$viewId\n")
-            resultsWithIssues.append(" - Issue: Touch target is too small.\n")
+            resultsWithIssues.append("• $viewTypeName: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: Touch target is too small (${widthDp}x${heightDp} dp).\n")
             resultsWithIssues.append(" - Suggestion: Increase the button size to at least 48x48 dp.\n")
         }
-
-        checkSpacing(node, viewId, results, resultsWithIssues)
     }
 
-    private fun checkSpacing(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
-        val nodeBounds = Rect()
-        node.getBoundsInScreen(nodeBounds)
+    private fun checkSpacing(node: AccessibilityNodeInfo, viewId: String, viewTypeName: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
 
         val minElementSpacingDp = 8
 
-        checkEdgeSpacing(nodeBounds, viewId, results, resultsWithIssues)
+        checkEdgeSpacing(bounds, viewId, viewTypeName, results, resultsWithIssues)
 
         val parentNode = node.parent ?: return
         val spacingScores = mutableListOf<Float>()
@@ -227,7 +238,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
             val siblingBounds = Rect()
             sibling.getBoundsInScreen(siblingBounds)
 
-            val spacing = calculateSpacing(nodeBounds, siblingBounds)
+            val spacing = calculateSpacing(bounds, siblingBounds)
             val spacingDp = convertPixelsToDp(spacing)
 
             val spacingScore = if (spacingDp >= minElementSpacingDp) 1.0f else (spacingDp / minElementSpacingDp)
@@ -236,10 +247,10 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
             if (spacingDp < minElementSpacingDp) {
                 results.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
-                results.append(" - Suggestion: Increase spacing to at least 8 dp.\n")
-                resultsWithIssues.append("Button: ID=$viewId\n")
+                results.append(" - Suggestion: Increase spacing between elements to at least 8 dp.\n")
+                resultsWithIssues.append("• $viewTypeName: ID=$viewId\n")
                 resultsWithIssues.append(" - Issue: Insufficient spacing between elements ($spacingDp dp).\n")
-                resultsWithIssues.append(" - Suggestion: Increase spacing to at least 8 dp.\n")
+                resultsWithIssues.append(" - Suggestion: Increase spacing between elements to at least 8 dp.\n")
             }
         }
 
@@ -249,11 +260,27 @@ class UIQualityAccessibilityService : AccessibilityService() {
             spacingScores.minOrNull() ?: 1.0f
         }
 
-        Log.d("FinalElementSpacingScore", "Element ID=$viewId, Final Spacing Score: $finalSpacingScore")
+        Log.d("FinalElementSpacingScore", "$viewTypeName ID=$viewId, Final Spacing Score: $finalSpacingScore")
         elementSpacingScores.add(finalSpacingScore)
     }
 
-    private fun checkEdgeSpacing(nodeBounds: Rect, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+    private fun calculateSpacing(bounds1: Rect, bounds2: Rect): Int {
+        val horizontalSpacing = when {
+            bounds1.right <= bounds2.left -> bounds2.left - bounds1.right
+            bounds2.right <= bounds1.left -> bounds1.left - bounds2.right
+            else -> 0
+        }
+
+        val verticalSpacing = when {
+            bounds1.bottom <= bounds2.top -> bounds2.top - bounds1.bottom
+            bounds2.bottom <= bounds1.top -> bounds1.top - bounds2.bottom
+            else -> 0
+        }
+
+        return max(horizontalSpacing, verticalSpacing).coerceAtLeast(0)
+    }
+
+    private fun checkEdgeSpacing(nodeBounds: Rect, viewId: String, viewTypeName: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
         val minEdgeSpacingDp = 16
 
         val leftSpacingDp = convertPixelsToDp(nodeBounds.left)
@@ -278,10 +305,10 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
         edgeSpacingScores.add(minScore)
 
-        Log.d("ElementEdgeScore", "Element ID=$viewId, Final Score: $minScore")
+        Log.d("ElementEdgeScore", "$viewTypeName ID=$viewId, Final Score: $minScore")
 
         if (minScore < 1.0f) {
-            resultsWithIssues.append("Element: ID=$viewId\n")
+            resultsWithIssues.append("• $viewTypeName: ID=$viewId\n")
             spacings.forEachIndexed { index, spacing ->
                 when (index) {
                     0 -> if (spacing < minEdgeSpacingDp) {
@@ -317,20 +344,41 @@ class UIQualityAccessibilityService : AccessibilityService() {
         return px / resources.displayMetrics.density
     }
 
-    private fun calculateSpacing(bounds1: Rect, bounds2: Rect): Int {
-        val horizontalSpacing = when {
-            bounds1.right <= bounds2.left -> bounds2.left - bounds1.right
-            bounds2.right <= bounds1.left -> bounds1.left - bounds2.right
-            else -> 0
+    private fun analyzeImageButton(node: AccessibilityNodeInfo, viewId: String, viewTypeName: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+        val contentDescription = node.contentDescription?.toString().orEmpty()
+
+        results.append("ImageButton found: ID=$viewId\n")
+
+        if (contentDescription.isEmpty()) {
+            results.append(" - Issue: Missing content description.\n")
+            results.append(" - Suggestion: Add a content description for accessibility.\n")
+            resultsWithIssues.append("• ImageButton: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: Missing content description.\n")
+            resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
 
-        val verticalSpacing = when {
-            bounds1.bottom <= bounds2.top -> bounds2.top - bounds1.bottom
-            bounds2.bottom <= bounds1.top -> bounds1.top - bounds2.bottom
-            else -> 0
+        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0.0f else 1.0f)
+
+        checkTouchArea(node, viewId, viewTypeName, results, resultsWithIssues)
+        checkSpacing(node, viewId, viewTypeName, results, resultsWithIssues)
+    }
+
+    private fun analyzeCheckBox(node: AccessibilityNodeInfo, viewId: String, viewTypeName: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+        val contentDescription = node.contentDescription?.toString().orEmpty()
+
+        results.append("CheckBox found: ID=$viewId\n")
+
+        if (contentDescription.isEmpty()) {
+            results.append(" - Issue: Missing content description.\n")
+            results.append(" - Suggestion: Add a content description for accessibility.\n")
+            resultsWithIssues.append("• CheckBox: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: Missing content description.\n")
+            resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
 
-        return max(horizontalSpacing, verticalSpacing).coerceAtLeast(0)
+        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0.0f else 1.0f)
+
+        checkSpacing(node, viewId, viewTypeName, results, resultsWithIssues)
     }
 
     private fun analyzeImageView(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
@@ -341,7 +389,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         if (contentDescription.isEmpty()) {
             results.append(" - Issue: Missing content description.\n")
             results.append(" - Suggestion: Add a content description for accessibility.\n")
-            resultsWithIssues.append("ImageView: ID=$viewId\n")
+            resultsWithIssues.append("• ImageView: ID=$viewId\n")
             resultsWithIssues.append(" - Issue: Missing content description.\n")
             resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
@@ -349,38 +397,21 @@ class UIQualityAccessibilityService : AccessibilityService() {
         contentDescriptionScores.add(if (contentDescription.isEmpty()) 0.0f else 1.0f)
     }
 
-    private fun analyzeImageButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
-        val contentDescription = node.contentDescription?.toString().orEmpty()
+    private fun analyzeEditText(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
+        val hint = node.text ?: node.hintText
 
-        results.append("ImageButton found: ID=$viewId\n")
+        results.append("EditText found: ID=$viewId\n")
 
-        if (contentDescription.isEmpty()) {
-            results.append(" - Issue: Missing content description.\n")
-            results.append(" - Suggestion: Add a content description for accessibility.\n")
-            resultsWithIssues.append("ImageButton: ID=$viewId\n")
-            resultsWithIssues.append(" - Issue: Missing content description.\n")
-            resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
+        if (hint.isNullOrEmpty()) {
+            results.append(" - Issue: EditText is missing a hint.\n")
+            results.append(" - Suggestion: Add a hint to the EditText to provide context to users.\n")
+            resultsWithIssues.append("• EditText: ID=$viewId\n")
+            resultsWithIssues.append(" - Issue: EditText is missing a hint.\n")
+            resultsWithIssues.append(" - Suggestion: Add a hint to provide context to users.\n")
         }
 
-        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0.0f else 1.0f)
-    }
-
-    private fun analyzeCheckBox(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
-        val contentDescription = node.contentDescription?.toString().orEmpty()
-
-        results.append("CheckBox found: ID=$viewId\n")
-
-        if (contentDescription.isEmpty()) {
-            results.append(" - Issue: Missing content description.\n")
-            results.append(" - Suggestion: Add a content description for accessibility.\n")
-            resultsWithIssues.append("CheckBox: ID=$viewId\n")
-            resultsWithIssues.append(" - Issue: Missing content description.\n")
-            resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
-        }
-
-        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0.0f else 1.0f)
-
-        checkSpacing(node, viewId, results, resultsWithIssues)
+        // Calculate hint text score
+        hintTextScores.add(if (hint.isNullOrEmpty()) 0.0f else 1.0f)
     }
 
     private fun calculateTouchAreaScore(): Float {
@@ -425,7 +456,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
             try {
                 outputStream = contentResolver.openOutputStream(uri)
                 outputStream?.bufferedWriter()?.use { writer ->
-                    writer.append("Element Type;ID;Issue;Suggestion;;;TouchAreaScore;ElementSpacingScore;EdgeSpacingScore;ContentDescriptionScore;HintTextScore\n")
+                    writer.append("Element Type;ID;Issues;Suggestions;;;TouchAreaScore;ElementSpacingScore;EdgeSpacingScore;ContentDescriptionScore;HintTextScore\n")
 
                     val lines = results.split("\n")
                     // Indexes for accessing the score lists
@@ -437,25 +468,25 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
                     var elementType = ""
                     var elementId = ""
-                    var issue = ""
-                    var suggestion = ""
+                    var issues = ""
+                    var suggestions = ""
 
                     for (line in lines) {
                         when {
                             line.contains("found:") -> {
                                 if (elementType.isNotEmpty()) {
                                     // Get the scores from the lists
-                                    val touchAreaScore = if (elementType == "Button") touchAreaScores.getOrNull(touchAreaScoresIndex) ?: "" else ""
+                                    val touchAreaScore = if (elementType == "Button" || elementType == "ImageButton") touchAreaScores.getOrNull(touchAreaScoresIndex) ?: "" else ""
                                     if (elementType == "Button") {
                                         touchAreaScoresIndex++
                                     }
 
-                                    val elementSpacingScore = if (elementType == "Button" || elementType == "CheckBox") elementSpacingScores.getOrNull(elementSpacingScoresIndex) ?: "" else ""
+                                    val elementSpacingScore = if (elementType == "Button" || elementType == "ImageButton" || elementType == "CheckBox") elementSpacingScores.getOrNull(elementSpacingScoresIndex) ?: "" else ""
                                     if (elementType == "Button" || elementType == "CheckBox") {
                                         elementSpacingScoresIndex++
                                     }
 
-                                    val edgeSpacingScore = if (elementType == "Button" || elementType == "CheckBox") edgeSpacingScores.getOrNull(edgeSpacingScoresIndex) ?: "" else ""
+                                    val edgeSpacingScore = if (elementType == "Button" || elementType == "ImageButton" || elementType == "CheckBox") edgeSpacingScores.getOrNull(edgeSpacingScoresIndex) ?: "" else ""
                                     if (elementType == "Button" || elementType == "CheckBox") {
                                         edgeSpacingScoresIndex++
                                     }
@@ -470,23 +501,31 @@ class UIQualityAccessibilityService : AccessibilityService() {
                                         hintTextScoresIndex++
                                     }
 
-                                    writer.append("$elementType;$elementId;$issue;$suggestion;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
+                                    writer.append("$elementType;$elementId;$issues;$suggestions;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
                                 }
                                 elementType = line.substringBefore(" found:").trim()
                                 elementId = line.substringAfter("ID=").substringBefore("\n").trim()
-                                issue = ""
-                                suggestion = ""
+                                issues = ""
+                                suggestions = ""
                             }
                             line.contains("Issue:") -> {
-                                issue = line.substringAfter("Issue:").trim()
+                                val currentIssue = line.substringAfter("Issue:").trim()
+                                if (issues.isNotEmpty()) {
+                                    issues += " "
+                                }
+                                issues += currentIssue
                             }
                             line.contains("Suggestion:") -> {
-                                suggestion = line.substringAfter("Suggestion:").trim()
+                                val currentSuggestion = line.substringAfter("Suggestion:").trim()
+                                if (suggestions.isNotEmpty()) {
+                                    suggestions += " "
+                                }
+                                suggestions += currentSuggestion
                             }
                         }
                     }
 
-                    if (elementType.isNotEmpty() || elementId.isNotEmpty() || issue.isNotEmpty() || suggestion.isNotEmpty()) {
+                    if (elementType.isNotEmpty() || elementId.isNotEmpty() || issues.isNotEmpty() || suggestions.isNotEmpty()) {
                         // Get the scores for the last element
                         val touchAreaScore = touchAreaScores.getOrNull(touchAreaScoresIndex) ?: ""
                         val elementSpacingScore = elementSpacingScores.getOrNull(elementSpacingScoresIndex) ?: ""
@@ -494,7 +533,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
                         val contentDescriptionScore = contentDescriptionScores.getOrNull(contentDescriptionScoresIndex) ?: ""
                         val hintTextScore = hintTextScores.getOrNull(hintTextScoresIndex) ?: ""
 
-                        writer.append("$elementType;$elementId;$issue;$suggestion;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
+                        writer.append("$elementType;$elementId;$issues;$suggestions;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
                     }
 
                     writer.append(";;;;;Average scores:")
@@ -507,8 +546,8 @@ class UIQualityAccessibilityService : AccessibilityService() {
                     )
                     writer.append(";;;;;Coefficients:")
                     writer.append(";$touchAreaScoreCoefficient;$elementSpacingScoreCoefficient;$edgeSpacingScoreCoefficient;$contentDescriptionScoreCoefficient;$hintTextScoreCoefficient\n")
-                    writer.append(";;;;;UI Quality Score:;" + String.format("%.3f", finalScore))
-                    writer.append("\n")
+                    writer.append(";;;;;UI Quality Score:;" + String.format("%.3f", finalScore) + "\n")
+                    writer.append(";;;;;UI Quality Minimal Score:;" + String.format("%.3f", finalMinimalScore) + "\n")
                 }
             } catch (e: IOException) {
                 e.printStackTrace()

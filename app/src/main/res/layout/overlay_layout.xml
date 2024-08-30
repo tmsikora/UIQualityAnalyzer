@@ -10,13 +10,16 @@
         android:id="@+id/start_analysis_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start Analysis" />
+        android:text="@string/start_analysis"
+        android:textStyle="bold"
+        android:backgroundTint="#92C5EF" />
 
     <Button
         android:id="@+id/minimize_results_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Minimize Results"
+        android:text="@string/minimize_results"
+        android:textStyle="bold"
         android:visibility="gone" />
 
     <ScrollView

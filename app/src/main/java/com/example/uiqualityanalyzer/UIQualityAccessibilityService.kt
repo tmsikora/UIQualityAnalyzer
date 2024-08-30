@@ -23,11 +23,12 @@ class UIQualityAccessibilityService : AccessibilityService() {
     private val hintTextScores = mutableListOf<Float>()
 
     // Set coefficients
-    private val touchAreaScoreCoefficient = 0.3f
-    private val elementSpacingScoreCoefficient = 0.2f
-    private val edgeSpacingScoreCoefficient = 0.2f
-    private val contentDescriptionScoreCoefficient = 0.15f
-    private val hintTextScoreCoefficient = 0.15f
+    private var touchAreaScoreCoefficient = 0.3f
+    private var elementSpacingScoreCoefficient = 0.2f
+    private var edgeSpacingScoreCoefficient = 0.2f
+    private var contentDescriptionScoreCoefficient = 0.15f
+    private var hintTextScoreCoefficient = 0.15f
+    private val numberOfCoefficients = 5
 
     private var touchAreaScore = 0.0f
     private var elementSpacingScore = 0.0f
@@ -416,27 +417,62 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
     private fun calculateTouchAreaScore(): Float {
         Log.d("TouchAreaScores", "Values: ${touchAreaScores.joinToString(", ")}")
-        return if (touchAreaScores.isEmpty()) 1.0f else touchAreaScores.average().toFloat()
+        return if (touchAreaScores.isEmpty()) {
+            elementSpacingScoreCoefficient += touchAreaScoreCoefficient/(numberOfCoefficients - 1)
+            edgeSpacingScoreCoefficient += touchAreaScoreCoefficient/(numberOfCoefficients - 1)
+            contentDescriptionScoreCoefficient += touchAreaScoreCoefficient/(numberOfCoefficients - 1)
+            hintTextScoreCoefficient += touchAreaScoreCoefficient/(numberOfCoefficients - 1)
+            touchAreaScoreCoefficient = 0.0f
+            0.0f
+        } else touchAreaScores.average().toFloat()
     }
 
     private fun calculateElementSpacingScore(): Float {
         Log.d("ElementSpacingScores", "Values: ${elementSpacingScores.joinToString(", ")}")
-        return if (elementSpacingScores.isEmpty()) 1.0f else elementSpacingScores.average().toFloat()
+        return if (elementSpacingScores.isEmpty()) {
+            touchAreaScoreCoefficient += elementSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            edgeSpacingScoreCoefficient += elementSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            contentDescriptionScoreCoefficient += elementSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            hintTextScoreCoefficient += elementSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            elementSpacingScoreCoefficient = 0.0f
+            0.0f
+        } else elementSpacingScores.average().toFloat()
     }
 
     private fun calculateEdgeSpacingScore(): Float {
         Log.d("EdgeSpacingScores", "Values: ${edgeSpacingScores.joinToString(", ")}")
-        return if (edgeSpacingScores.isEmpty()) 1.0f else edgeSpacingScores.average().toFloat()
+        return if (edgeSpacingScores.isEmpty()) {
+            touchAreaScoreCoefficient += edgeSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            elementSpacingScoreCoefficient += edgeSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            contentDescriptionScoreCoefficient += edgeSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            hintTextScoreCoefficient += edgeSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            edgeSpacingScoreCoefficient = 0.0f
+            0.0f
+        } else edgeSpacingScores.average().toFloat()
     }
 
     private fun calculateContentDescriptionScore(): Float {
         Log.d("ContentDescriptionScores", "Values: ${contentDescriptionScores.joinToString(", ")}")
-        return if (contentDescriptionScores.isEmpty()) 1.0f else contentDescriptionScores.average().toFloat()
+        return if (contentDescriptionScores.isEmpty()) {
+            touchAreaScoreCoefficient += contentDescriptionScoreCoefficient/(numberOfCoefficients - 1)
+            elementSpacingScoreCoefficient += contentDescriptionScoreCoefficient/(numberOfCoefficients - 1)
+            edgeSpacingScoreCoefficient += contentDescriptionScoreCoefficient/(numberOfCoefficients - 1)
+            hintTextScoreCoefficient += contentDescriptionScoreCoefficient/(numberOfCoefficients - 1)
+            contentDescriptionScoreCoefficient = 0.0f
+            0.0f
+        } else contentDescriptionScores.average().toFloat()
     }
 
     private fun calculateHintTextScore(): Float {
         Log.d("HintTextScores", "Values: ${hintTextScores.joinToString(", ")}")
-        return if (hintTextScores.isEmpty()) 1.0f else hintTextScores.average().toFloat()
+        return if (hintTextScores.isEmpty()) {
+            touchAreaScoreCoefficient += hintTextScoreCoefficient/(numberOfCoefficients - 1)
+            elementSpacingScoreCoefficient += hintTextScoreCoefficient/(numberOfCoefficients - 1)
+            edgeSpacingScoreCoefficient += hintTextScoreCoefficient/(numberOfCoefficients - 1)
+            contentDescriptionScoreCoefficient += hintTextScoreCoefficient/(numberOfCoefficients - 1)
+            hintTextScoreCoefficient = 0.0f
+            0.0f
+        } else hintTextScores.average().toFloat()
     }
 
     @SuppressLint("DefaultLocale")
@@ -501,7 +537,14 @@ class UIQualityAccessibilityService : AccessibilityService() {
                                         hintTextScoresIndex++
                                     }
 
-                                    writer.append("$elementType;$elementId;$issues;$suggestions;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
+                                    // Convert the scores to strings and replace dots with commas
+                                    val touchAreaScoreFormatted = touchAreaScore.toString().replace('.', ',')
+                                    val elementSpacingScoreFormatted = elementSpacingScore.toString().replace('.', ',')
+                                    val edgeSpacingScoreFormatted = edgeSpacingScore.toString().replace('.', ',')
+                                    val contentDescriptionScoreFormatted = contentDescriptionScore.toString().replace('.', ',')
+                                    val hintTextScoreFormatted = hintTextScore.toString().replace('.', ',')
+
+                                    writer.append("$elementType;$elementId;$issues;$suggestions;;;$touchAreaScoreFormatted;$elementSpacingScoreFormatted;$edgeSpacingScoreFormatted;$contentDescriptionScoreFormatted;$hintTextScoreFormatted;\n")
                                 }
                                 elementType = line.substringBefore(" found:").trim()
                                 elementId = line.substringAfter("ID=").substringBefore("\n").trim()
@@ -533,21 +576,49 @@ class UIQualityAccessibilityService : AccessibilityService() {
                         val contentDescriptionScore = contentDescriptionScores.getOrNull(contentDescriptionScoresIndex) ?: ""
                         val hintTextScore = hintTextScores.getOrNull(hintTextScoresIndex) ?: ""
 
-                        writer.append("$elementType;$elementId;$issues;$suggestions;;;$touchAreaScore;$elementSpacingScore;$edgeSpacingScore;$contentDescriptionScore;$hintTextScore;\n")
+                        // Convert the scores to strings and replace dots with commas
+                        val touchAreaScoreFormatted = touchAreaScore.toString().replace('.', ',')
+                        val elementSpacingScoreFormatted = elementSpacingScore.toString().replace('.', ',')
+                        val edgeSpacingScoreFormatted = edgeSpacingScore.toString().replace('.', ',')
+                        val contentDescriptionScoreFormatted = contentDescriptionScore.toString().replace('.', ',')
+                        val hintTextScoreFormatted = hintTextScore.toString().replace('.', ',')
+
+                        writer.append("$elementType;$elementId;$issues;$suggestions;;;$touchAreaScoreFormatted;$elementSpacingScoreFormatted;$edgeSpacingScoreFormatted;$contentDescriptionScoreFormatted;$hintTextScoreFormatted;\n")
                     }
+
+                    // Format the scores and replace dots with commas
+                    val touchAreaScoreFormatted = String.format("%.3f", touchAreaScore).replace('.', ',')
+                    val elementSpacingScoreFormatted = String.format("%.3f", elementSpacingScore).replace('.', ',')
+                    val edgeSpacingScoreFormatted = String.format("%.3f", edgeSpacingScore).replace('.', ',')
+                    val contentDescriptionScoreFormatted = String.format("%.3f", contentDescriptionScore).replace('.', ',')
+                    val hintTextScoreFormatted = String.format("%.3f", hintTextScore).replace('.', ',')
+                    val finalScoreFormatted = String.format("%.3f", finalScore).replace('.', ',')
+                    val finalMinimalScoreFormatted = String.format("%.3f", finalMinimalScore).replace('.', ',')
+
+                    // Format the coefficients and replace dots with commas
+                    val touchAreaScoreCoefficientFormatted = touchAreaScoreCoefficient.toString().replace('.', ',')
+                    val elementSpacingScoreCoefficientFormatted = elementSpacingScoreCoefficient.toString().replace('.', ',')
+                    val edgeSpacingScoreCoefficientFormatted = edgeSpacingScoreCoefficient.toString().replace('.', ',')
+                    val contentDescriptionScoreCoefficientFormatted = contentDescriptionScoreCoefficient.toString().replace('.', ',')
+                    val hintTextScoreCoefficientFormatted = hintTextScoreCoefficient.toString().replace('.', ',')
 
                     writer.append(";;;;;Average scores:")
                     writer.append(";" +
-                            String.format("%.3f", touchAreaScore) + ";" +
-                            String.format("%.3f", elementSpacingScore) + ";" +
-                            String.format("%.3f", edgeSpacingScore) + ";" +
-                            String.format("%.3f", contentDescriptionScore) + ";" +
-                            String.format("%.3f", hintTextScore) + "\n"
+                            "$touchAreaScoreFormatted;" +
+                            "$elementSpacingScoreFormatted;" +
+                            "$edgeSpacingScoreFormatted;" +
+                            "$contentDescriptionScoreFormatted;" +
+                            "$hintTextScoreFormatted\n"
                     )
                     writer.append(";;;;;Coefficients:")
-                    writer.append(";$touchAreaScoreCoefficient;$elementSpacingScoreCoefficient;$edgeSpacingScoreCoefficient;$contentDescriptionScoreCoefficient;$hintTextScoreCoefficient\n")
-                    writer.append(";;;;;UI Quality Score:;" + String.format("%.3f", finalScore) + "\n")
-                    writer.append(";;;;;UI Quality Minimal Score:;" + String.format("%.3f", finalMinimalScore) + "\n")
+                    writer.append(";" +
+                            "$touchAreaScoreCoefficientFormatted;" +
+                            "$elementSpacingScoreCoefficientFormatted;" +
+                            "$edgeSpacingScoreCoefficientFormatted;" +
+                            "$contentDescriptionScoreCoefficientFormatted;" +
+                            "$hintTextScoreCoefficientFormatted\n")
+                    writer.append(";;;;;UI Quality Score:;$finalScoreFormatted\n")
+                    writer.append(";;;;;UI Quality Minimal Score:;$finalMinimalScoreFormatted\n")
                 }
             } catch (e: IOException) {
                 e.printStackTrace()

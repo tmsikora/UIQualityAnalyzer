@@ -85,6 +85,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         val fileName = "ui_analysis_results.csv"
         val fileLocation = "Documents/$fileName"
         resultsWithIssues.append("Analysis results have been saved to file: $fileLocation\n\n")
+        resultsWithIssues.append("List of identified issues:\n")
 
         if (rootNode != null) {
             analyzeNode(rootNode, results, resultsWithIssues)
@@ -114,9 +115,9 @@ class UIQualityAccessibilityService : AccessibilityService() {
         Log.i("UIQualityAnalyzer", "contentDescriptionScore: $contentDescriptionScore%")
         Log.i("UIQualityAnalyzer", "hintTextScore: $hintTextScore%")
 
-        val formattedScore = String.format("%.2f", finalScore)
+        val formattedScore = String.format("%.3f", finalScore)
         results.append(0, "UI Quality Score: $formattedScore%\n\n")
-        resultsWithIssues.insert(0, "UI Quality Score: $formattedScore%\n\n")
+        resultsWithIssues.insert(0, "UI Quality Score: $formattedScore\n(calculated in 0-1 scale, where 0 is the lowest score and 1 is the highest)\n\n")
         Log.i("UIQualityAnalyzer", "Final UI Quality Score: $finalScore%")
 
         saveResultsToCsv(results.toString())
@@ -182,7 +183,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         }
 
         // Calculate hint text score
-        hintTextScores.add(if (hint.isNullOrEmpty()) 0f else 100f)
+        hintTextScores.add(if (hint.isNullOrEmpty()) 0.0f else 1.0f)
     }
 
     private fun analyzeButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
@@ -194,7 +195,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         results.append("Button found: ID=$viewId\n")
         results.append(" - Width: $widthDp dp, Height: $heightDp dp\n")
 
-        val areaScore = if (widthDp >= 48 && heightDp >= 48) 100f else (widthDp * heightDp / (48 * 48)) * 100
+        val areaScore = if (widthDp >= 48 && heightDp >= 48) 1.0f else (widthDp * heightDp / (48 * 48))
         touchAreaScores.add(areaScore)
 
         if (widthDp < 48 || heightDp < 48) { // Check if either dimension is less than 48dp
@@ -229,7 +230,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
             val spacing = calculateSpacing(nodeBounds, siblingBounds)
             val spacingDp = convertPixelsToDp(spacing)
 
-            val spacingScore = if (spacingDp >= minElementSpacingDp) 100f else (spacingDp / minElementSpacingDp) * 100
+            val spacingScore = if (spacingDp >= minElementSpacingDp) 1.0f else (spacingDp / minElementSpacingDp)
             spacingScores.add(spacingScore)
             Log.d("ElementSpacingScores", "Sibling spacing: $spacingDp dp, Score: $spacingScore")
 
@@ -245,7 +246,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         val finalSpacingScore = if (spacingScores.isEmpty()) {
             100f
         } else {
-            spacingScores.minOrNull() ?: 100f
+            spacingScores.minOrNull() ?: 1.0f
         }
 
         Log.d("FinalElementSpacingScore", "Element ID=$viewId, Final Spacing Score: $finalSpacingScore")
@@ -264,10 +265,10 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
         val spacings = listOf(leftSpacingDp, rightSpacingDp, topSpacingDp, bottomSpacingDp)
 
-        var minScore = 100f
+        var minScore = 1.0f
 
         spacings.forEach { spacing ->
-            val score = if (spacing >= minEdgeSpacingDp) 100f else ((spacing / minEdgeSpacingDp.coerceAtLeast(1)) * 100f).coerceAtLeast(0f)
+            val score = if (spacing >= minEdgeSpacingDp) 1.0f else (spacing / minEdgeSpacingDp.coerceAtLeast(1)).coerceAtLeast(0.0f)
             Log.d("EdgeSpacingScores", "Spacing: $spacing dp, Score: $score")
 
             if (score < minScore) {
@@ -279,7 +280,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
         Log.d("ElementEdgeScore", "Element ID=$viewId, Final Score: $minScore")
 
-        if (minScore < 100f) {
+        if (minScore < 1.0f) {
             resultsWithIssues.append("Element: ID=$viewId\n")
             spacings.forEachIndexed { index, spacing ->
                 when (index) {
@@ -345,7 +346,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
             resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
 
-        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0f else 100f)
+        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0.0f else 1.0f)
     }
 
     private fun analyzeImageButton(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
@@ -361,7 +362,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
             resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
 
-        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0f else 100f)
+        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0.0f else 1.0f)
     }
 
     private fun analyzeCheckBox(node: AccessibilityNodeInfo, viewId: String, results: StringBuilder, resultsWithIssues: StringBuilder) {
@@ -377,34 +378,34 @@ class UIQualityAccessibilityService : AccessibilityService() {
             resultsWithIssues.append(" - Suggestion: Add a content description for accessibility.\n")
         }
 
-        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0f else 100f)
+        contentDescriptionScores.add(if (contentDescription.isEmpty()) 0.0f else 1.0f)
 
         checkSpacing(node, viewId, results, resultsWithIssues)
     }
 
     private fun calculateTouchAreaScore(): Float {
         Log.d("TouchAreaScores", "Values: ${touchAreaScores.joinToString(", ")}")
-        return if (touchAreaScores.isEmpty()) 100f else touchAreaScores.average().toFloat()
+        return if (touchAreaScores.isEmpty()) 1.0f else touchAreaScores.average().toFloat()
     }
 
     private fun calculateElementSpacingScore(): Float {
         Log.d("ElementSpacingScores", "Values: ${elementSpacingScores.joinToString(", ")}")
-        return if (elementSpacingScores.isEmpty()) 100f else elementSpacingScores.average().toFloat()
+        return if (elementSpacingScores.isEmpty()) 1.0f else elementSpacingScores.average().toFloat()
     }
 
     private fun calculateEdgeSpacingScore(): Float {
         Log.d("EdgeSpacingScores", "Values: ${edgeSpacingScores.joinToString(", ")}")
-        return if (edgeSpacingScores.isEmpty()) 100f else edgeSpacingScores.average().toFloat()
+        return if (edgeSpacingScores.isEmpty()) 1.0f else edgeSpacingScores.average().toFloat()
     }
 
     private fun calculateContentDescriptionScore(): Float {
         Log.d("ContentDescriptionScores", "Values: ${contentDescriptionScores.joinToString(", ")}")
-        return if (contentDescriptionScores.isEmpty()) 100f else contentDescriptionScores.average().toFloat()
+        return if (contentDescriptionScores.isEmpty()) 1.0f else contentDescriptionScores.average().toFloat()
     }
 
     private fun calculateHintTextScore(): Float {
         Log.d("HintTextScores", "Values: ${hintTextScores.joinToString(", ")}")
-        return if (hintTextScores.isEmpty()) 100f else hintTextScores.average().toFloat()
+        return if (hintTextScores.isEmpty()) 1.0f else hintTextScores.average().toFloat()
     }
 
     @SuppressLint("DefaultLocale")
@@ -498,15 +499,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
                     writer.append(";;;;;Average scores:")
                     writer.append(";" +
-                            String.format("%.2f", touchAreaScore) + ";" +
-                            String.format("%.2f", elementSpacingScore) + ";" +
-                            String.format("%.2f", edgeSpacingScore) + ";" +
-                            String.format("%.2f", contentDescriptionScore) + ";" +
-                            String.format("%.2f", hintTextScore) + "\n"
+                            String.format("%.3f", touchAreaScore) + ";" +
+                            String.format("%.3f", elementSpacingScore) + ";" +
+                            String.format("%.3f", edgeSpacingScore) + ";" +
+                            String.format("%.3f", contentDescriptionScore) + ";" +
+                            String.format("%.3f", hintTextScore) + "\n"
                     )
                     writer.append(";;;;;Coefficients:")
                     writer.append(";$touchAreaScoreCoefficient;$elementSpacingScoreCoefficient;$edgeSpacingScoreCoefficient;$contentDescriptionScoreCoefficient;$hintTextScoreCoefficient\n")
-                    writer.append(";;;;;UI Quality Score:;" + String.format("%.2f", finalScore))
+                    writer.append(";;;;;UI Quality Score:;" + String.format("%.3f", finalScore))
                     writer.append("\n")
                 }
             } catch (e: IOException) {

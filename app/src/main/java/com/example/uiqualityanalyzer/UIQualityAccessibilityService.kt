@@ -28,7 +28,6 @@ class UIQualityAccessibilityService : AccessibilityService() {
     private var edgeSpacingScoreCoefficient = 0.2f
     private var contentDescriptionScoreCoefficient = 0.15f
     private var hintTextScoreCoefficient = 0.15f
-    private val numberOfCoefficients = 5
 
     private var touchAreaScore = 0.0f
     private var elementSpacingScore = 0.0f
@@ -145,6 +144,10 @@ class UIQualityAccessibilityService : AccessibilityService() {
         Log.i("UIQualityAnalyzer", "Final UI Quality Score: $finalScore%")
 
         saveResultsToCsv(results.toString())
+
+        if (touchAreaScores.isEmpty() && elementSpacingScores.isEmpty() && edgeSpacingScores.isEmpty() && contentDescriptionScores.isEmpty() && hintTextScores.isEmpty()) {
+            resultsWithIssues.append("<no issues found>\n")
+        }
 
         // Start OverlayService with the analysis result
         val overlayServiceIntent = Intent(this, OverlayService::class.java).apply {
@@ -415,13 +418,31 @@ class UIQualityAccessibilityService : AccessibilityService() {
         hintTextScores.add(if (hint.isNullOrEmpty()) 0.0f else 1.0f)
     }
 
+    private fun redistributeCoefficient(
+        zeroedCoefficient: Float,
+        coefficients: MutableList<Pair<Float, (Float) -> Unit>>
+    ) {
+        val nonZeroCoefficients = coefficients.filter { it.first > 0 }
+        if (nonZeroCoefficients.isNotEmpty()) {
+            val redistributeValue = zeroedCoefficient / nonZeroCoefficients.size
+            for ((currentValue, updateFunction) in nonZeroCoefficients) {
+                updateFunction(currentValue + redistributeValue)
+            }
+        }
+    }
+
     private fun calculateTouchAreaScore(): Float {
         Log.d("TouchAreaScores", "Values: ${touchAreaScores.joinToString(", ")}")
         return if (touchAreaScores.isEmpty()) {
-            elementSpacingScoreCoefficient += touchAreaScoreCoefficient/(numberOfCoefficients - 1)
-            edgeSpacingScoreCoefficient += touchAreaScoreCoefficient/(numberOfCoefficients - 1)
-            contentDescriptionScoreCoefficient += touchAreaScoreCoefficient/(numberOfCoefficients - 1)
-            hintTextScoreCoefficient += touchAreaScoreCoefficient/(numberOfCoefficients - 1)
+            redistributeCoefficient(
+                touchAreaScoreCoefficient,
+                mutableListOf(
+                    Pair(elementSpacingScoreCoefficient) { newValue -> elementSpacingScoreCoefficient = newValue },
+                    Pair(edgeSpacingScoreCoefficient) { newValue -> edgeSpacingScoreCoefficient = newValue },
+                    Pair(contentDescriptionScoreCoefficient) { newValue -> contentDescriptionScoreCoefficient = newValue },
+                    Pair(hintTextScoreCoefficient) { newValue -> hintTextScoreCoefficient = newValue }
+                )
+            )
             touchAreaScoreCoefficient = 0.0f
             0.0f
         } else touchAreaScores.average().toFloat()
@@ -430,10 +451,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
     private fun calculateElementSpacingScore(): Float {
         Log.d("ElementSpacingScores", "Values: ${elementSpacingScores.joinToString(", ")}")
         return if (elementSpacingScores.isEmpty()) {
-            touchAreaScoreCoefficient += elementSpacingScoreCoefficient/(numberOfCoefficients - 1)
-            edgeSpacingScoreCoefficient += elementSpacingScoreCoefficient/(numberOfCoefficients - 1)
-            contentDescriptionScoreCoefficient += elementSpacingScoreCoefficient/(numberOfCoefficients - 1)
-            hintTextScoreCoefficient += elementSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            redistributeCoefficient(
+                elementSpacingScoreCoefficient,
+                mutableListOf(
+                    Pair(touchAreaScoreCoefficient) { newValue -> touchAreaScoreCoefficient = newValue },
+                    Pair(edgeSpacingScoreCoefficient) { newValue -> edgeSpacingScoreCoefficient = newValue },
+                    Pair(contentDescriptionScoreCoefficient) { newValue -> contentDescriptionScoreCoefficient = newValue },
+                    Pair(hintTextScoreCoefficient) { newValue -> hintTextScoreCoefficient = newValue }
+                )
+            )
             elementSpacingScoreCoefficient = 0.0f
             0.0f
         } else elementSpacingScores.average().toFloat()
@@ -442,10 +468,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
     private fun calculateEdgeSpacingScore(): Float {
         Log.d("EdgeSpacingScores", "Values: ${edgeSpacingScores.joinToString(", ")}")
         return if (edgeSpacingScores.isEmpty()) {
-            touchAreaScoreCoefficient += edgeSpacingScoreCoefficient/(numberOfCoefficients - 1)
-            elementSpacingScoreCoefficient += edgeSpacingScoreCoefficient/(numberOfCoefficients - 1)
-            contentDescriptionScoreCoefficient += edgeSpacingScoreCoefficient/(numberOfCoefficients - 1)
-            hintTextScoreCoefficient += edgeSpacingScoreCoefficient/(numberOfCoefficients - 1)
+            redistributeCoefficient(
+                edgeSpacingScoreCoefficient,
+                mutableListOf(
+                    Pair(touchAreaScoreCoefficient) { newValue -> touchAreaScoreCoefficient = newValue },
+                    Pair(elementSpacingScoreCoefficient) { newValue -> elementSpacingScoreCoefficient = newValue },
+                    Pair(contentDescriptionScoreCoefficient) { newValue -> contentDescriptionScoreCoefficient = newValue },
+                    Pair(hintTextScoreCoefficient) { newValue -> hintTextScoreCoefficient = newValue }
+                )
+            )
             edgeSpacingScoreCoefficient = 0.0f
             0.0f
         } else edgeSpacingScores.average().toFloat()
@@ -454,10 +485,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
     private fun calculateContentDescriptionScore(): Float {
         Log.d("ContentDescriptionScores", "Values: ${contentDescriptionScores.joinToString(", ")}")
         return if (contentDescriptionScores.isEmpty()) {
-            touchAreaScoreCoefficient += contentDescriptionScoreCoefficient/(numberOfCoefficients - 1)
-            elementSpacingScoreCoefficient += contentDescriptionScoreCoefficient/(numberOfCoefficients - 1)
-            edgeSpacingScoreCoefficient += contentDescriptionScoreCoefficient/(numberOfCoefficients - 1)
-            hintTextScoreCoefficient += contentDescriptionScoreCoefficient/(numberOfCoefficients - 1)
+            redistributeCoefficient(
+                contentDescriptionScoreCoefficient,
+                mutableListOf(
+                    Pair(touchAreaScoreCoefficient) { newValue -> touchAreaScoreCoefficient = newValue },
+                    Pair(elementSpacingScoreCoefficient) { newValue -> elementSpacingScoreCoefficient = newValue },
+                    Pair(edgeSpacingScoreCoefficient) { newValue -> edgeSpacingScoreCoefficient = newValue },
+                    Pair(hintTextScoreCoefficient) { newValue -> hintTextScoreCoefficient = newValue }
+                )
+            )
             contentDescriptionScoreCoefficient = 0.0f
             0.0f
         } else contentDescriptionScores.average().toFloat()
@@ -466,10 +502,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
     private fun calculateHintTextScore(): Float {
         Log.d("HintTextScores", "Values: ${hintTextScores.joinToString(", ")}")
         return if (hintTextScores.isEmpty()) {
-            touchAreaScoreCoefficient += hintTextScoreCoefficient/(numberOfCoefficients - 1)
-            elementSpacingScoreCoefficient += hintTextScoreCoefficient/(numberOfCoefficients - 1)
-            edgeSpacingScoreCoefficient += hintTextScoreCoefficient/(numberOfCoefficients - 1)
-            contentDescriptionScoreCoefficient += hintTextScoreCoefficient/(numberOfCoefficients - 1)
+            redistributeCoefficient(
+                hintTextScoreCoefficient,
+                mutableListOf(
+                    Pair(touchAreaScoreCoefficient) { newValue -> touchAreaScoreCoefficient = newValue },
+                    Pair(elementSpacingScoreCoefficient) { newValue -> elementSpacingScoreCoefficient = newValue },
+                    Pair(edgeSpacingScoreCoefficient) { newValue -> edgeSpacingScoreCoefficient = newValue },
+                    Pair(contentDescriptionScoreCoefficient) { newValue -> contentDescriptionScoreCoefficient = newValue }
+                )
+            )
             hintTextScoreCoefficient = 0.0f
             0.0f
         } else hintTextScores.average().toFloat()

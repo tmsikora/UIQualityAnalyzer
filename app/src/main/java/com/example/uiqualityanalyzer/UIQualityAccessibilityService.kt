@@ -210,16 +210,20 @@ class UIQualityAccessibilityService : AccessibilityService() {
         val widthDp = convertPixelsToDp(bounds.width())
         val heightDp = convertPixelsToDp(bounds.height())
 
-        results.append(" - Width: $widthDp dp, Height: $heightDp dp\n")
+        // Ensure width and height are not negative
+        val adjustedWidthDp = maxOf(widthDp, 0.0f)
+        val adjustedHeightDp = maxOf(heightDp, 0.0f)
 
-        val areaScore = if (widthDp >= 48 && heightDp >= 48) 1.0f else (widthDp * heightDp / (48 * 48))
+        results.append(" - Width: $adjustedWidthDp dp, Height: $adjustedHeightDp dp\n")
+
+        val areaScore = if (adjustedWidthDp >= 48 && adjustedHeightDp >= 48) 1.0f else (adjustedWidthDp * adjustedHeightDp / (48 * 48))
         touchAreaScores.add(areaScore)
 
-        if (widthDp < 48 || heightDp < 48) { // Check if either dimension is less than 48dp
-            results.append(" - Issue: Touch target is too small (${widthDp}x${heightDp} dp).\n")
+        if (adjustedWidthDp < 48 || adjustedHeightDp < 48) { // Check if either dimension is less than 48dp
+            results.append(" - Issue: Touch target is too small (${adjustedWidthDp}x${adjustedHeightDp} dp).\n")
             results.append(" - Suggestion: Increase the button size to at least 48x48 dp.\n")
             resultsWithIssues.append("• $viewTypeName: ID=$viewId\n")
-            resultsWithIssues.append(" - Issue: Touch target is too small (${widthDp}x${heightDp} dp).\n")
+            resultsWithIssues.append(" - Issue: Touch target is too small (${adjustedWidthDp}x${adjustedHeightDp} dp).\n")
             resultsWithIssues.append(" - Suggestion: Increase the button size to at least 48x48 dp.\n")
         }
     }

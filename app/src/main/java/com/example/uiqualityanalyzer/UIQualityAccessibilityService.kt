@@ -135,12 +135,12 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
         val formattedMinimalScore = String.format("%.3f", finalMinimalScore)
         results.append(0, "UI Quality Minimal Score: $formattedMinimalScore%\n\n")
-        resultsWithIssues.insert(0, "UI Quality Minimal Score: $formattedMinimalScore\n(calculated from multiplication of lowest quality parameter values and their coefficients)\n\n")
+        resultsWithIssues.insert(0, "UI Quality Minimal Score: $formattedMinimalScore\n(calculated as the sum of the products of each quality parameter's lowest value and its respective coefficient)\n\n")
         Log.i("UIQualityAnalyzer", "Final UI Quality Minimal Score: $finalMinimalScore%")
 
         val formattedScore = String.format("%.3f", finalScore)
         results.append(0, "UI Quality Score: $formattedScore%\n\n")
-        resultsWithIssues.insert(0, "UI Quality Score: $formattedScore\n(calculated from multiplication of average quality parameter scores and their coefficients)\n\n")
+        resultsWithIssues.insert(0, "UI Quality Score: $formattedScore\n(calculated as the sum of the products of average quality parameter scores and their coefficients)\n\n")
         Log.i("UIQualityAnalyzer", "Final UI Quality Score: $finalScore%")
 
         saveResultsToCsv(results.toString())

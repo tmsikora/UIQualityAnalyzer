@@ -298,7 +298,12 @@ class UIQualityAccessibilityService : AccessibilityService() {
         val bottomSpacingDp =
             convertPixelsToDp(resources.displayMetrics.heightPixels - nodeBounds.bottom)
 
-        val spacings = listOf(leftSpacingDp, rightSpacingDp, topSpacingDp, bottomSpacingDp)
+        val adjustedLeftSpacingDp = maxOf(leftSpacingDp, 0.0f)
+        val adjustedRightSpacingDp = maxOf(rightSpacingDp, 0.0f)
+        val adjustedTopSpacingDp = maxOf(topSpacingDp, 0.0f)
+        val adjustedBottomSpacingDp = maxOf(bottomSpacingDp, 0.0f)
+
+        val spacings = listOf(adjustedLeftSpacingDp, adjustedRightSpacingDp, adjustedTopSpacingDp, adjustedBottomSpacingDp)
 
         var minScore = 1.0f
 
@@ -320,27 +325,27 @@ class UIQualityAccessibilityService : AccessibilityService() {
             spacings.forEachIndexed { index, spacing ->
                 when (index) {
                     0 -> if (spacing < minEdgeSpacingDp) {
-                        results.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
+                        results.append(" - Issue: Element is too close to the left edge ($adjustedLeftSpacingDp dp).\n")
                         results.append(" - Suggestion: Increase spacing from the left edge to at least $minEdgeSpacingDp dp.\n")
-                        resultsWithIssues.append(" - Issue: Element is too close to the left edge ($leftSpacingDp dp).\n")
+                        resultsWithIssues.append(" - Issue: Element is too close to the left edge ($adjustedLeftSpacingDp dp).\n")
                         resultsWithIssues.append(" - Suggestion: Increase spacing from the left edge to at least $minEdgeSpacingDp dp.\n")
                     }
                     1 -> if (spacing < minEdgeSpacingDp) {
-                        results.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
+                        results.append(" - Issue: Element is too close to the right edge ($adjustedRightSpacingDp dp).\n")
                         results.append(" - Suggestion: Increase spacing from the right edge to at least $minEdgeSpacingDp dp.\n")
-                        resultsWithIssues.append(" - Issue: Element is too close to the right edge ($rightSpacingDp dp).\n")
+                        resultsWithIssues.append(" - Issue: Element is too close to the right edge ($adjustedRightSpacingDp dp).\n")
                         resultsWithIssues.append(" - Suggestion: Increase spacing from the right edge to at least $minEdgeSpacingDp dp.\n")
                     }
                     2 -> if (spacing < minEdgeSpacingDp) {
-                        results.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
+                        results.append(" - Issue: Element is too close to the top edge ($adjustedTopSpacingDp dp).\n")
                         results.append(" - Suggestion: Increase spacing from the top edge to at least $minEdgeSpacingDp dp.\n")
-                        resultsWithIssues.append(" - Issue: Element is too close to the top edge ($topSpacingDp dp).\n")
+                        resultsWithIssues.append(" - Issue: Element is too close to the top edge ($adjustedTopSpacingDp dp).\n")
                         resultsWithIssues.append(" - Suggestion: Increase spacing from the top edge to at least $minEdgeSpacingDp dp.\n")
                     }
                     3 -> if (spacing < minEdgeSpacingDp) {
-                        results.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
+                        results.append(" - Issue: Element is too close to the bottom edge ($adjustedBottomSpacingDp dp).\n")
                         results.append(" - Suggestion: Increase spacing from the bottom edge to at least $minEdgeSpacingDp dp.\n")
-                        resultsWithIssues.append(" - Issue: Element is too close to the bottom edge ($bottomSpacingDp dp).\n")
+                        resultsWithIssues.append(" - Issue: Element is too close to the bottom edge ($adjustedBottomSpacingDp dp).\n")
                         resultsWithIssues.append(" - Suggestion: Increase spacing from the bottom edge to at least $minEdgeSpacingDp dp.\n")
                     }
                 }

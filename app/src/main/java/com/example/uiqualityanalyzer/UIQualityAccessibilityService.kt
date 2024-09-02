@@ -149,6 +149,10 @@ class UIQualityAccessibilityService : AccessibilityService() {
             resultsWithIssues.append("<no issues found>\n")
         }
 
+        if (!resultsWithIssues.contains("Issue")) {
+            resultsWithIssues.append("<no issues found>\n")
+        }
+
         // Start OverlayService with the analysis result
         val overlayServiceIntent = Intent(this, OverlayService::class.java).apply {
             putExtra("analysis_result", resultsWithIssues.toString())

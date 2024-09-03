@@ -213,6 +213,7 @@ class UIQualityAccessibilityService : AccessibilityService() {
         node.getBoundsInScreen(bounds)
         val widthDp = convertPixelsToDp(bounds.width())
         val heightDp = convertPixelsToDp(bounds.height())
+        val minHeightAndWidth = 48
 
         // Ensure width and height are not negative
         val adjustedWidthDp = maxOf(widthDp, 0.0f)
@@ -220,7 +221,15 @@ class UIQualityAccessibilityService : AccessibilityService() {
 
         results.append(" - Width: $adjustedWidthDp dp, Height: $adjustedHeightDp dp\n")
 
-        val areaScore = if (adjustedWidthDp >= 48 && adjustedHeightDp >= 48) 1.0f else (adjustedWidthDp * adjustedHeightDp / (48 * 48))
+        val areaScore = if (adjustedWidthDp < minHeightAndWidth && adjustedHeightDp < minHeightAndWidth) {
+            (adjustedWidthDp * adjustedHeightDp) / (minHeightAndWidth * minHeightAndWidth)
+        } else if (adjustedWidthDp >= minHeightAndWidth && adjustedHeightDp < minHeightAndWidth) {
+            adjustedHeightDp / minHeightAndWidth
+        } else if (adjustedWidthDp < minHeightAndWidth && adjustedHeightDp >= minHeightAndWidth) {
+            adjustedWidthDp / minHeightAndWidth
+        } else {
+            1.0f
+        }
         touchAreaScores.add(areaScore)
 
         if (adjustedWidthDp < 48 || adjustedHeightDp < 48) { // Check if either dimension is less than 48dp
